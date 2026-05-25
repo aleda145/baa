@@ -3,9 +3,9 @@ import { MicrophonePitchController } from '../audio/microphone'
 import { createPitchLaneFilter, updatePitchLaneFilter } from '../audio/pitchLane'
 import {
   COURSE_LENGTH,
-  SHEEP_SCREEN_X,
   createInitialGameState,
-  getVisibleItems,
+  distanceToScreenX,
+  getCourseItems,
   laneToPercent,
   updateGameState,
 } from '../game/engine'
@@ -234,8 +234,9 @@ function GameScene({
   baselineHz: number
 }) {
   const sheepTop = laneToPercent(game.sheep.lanePosition)
-  const visibleItems = getVisibleItems(game)
-  const barnX = SHEEP_SCREEN_X + ((COURSE_LENGTH - game.progress) / 720) * 100
+  const courseItems = getCourseItems(game)
+  const sheepX = distanceToScreenX(game.progress)
+  const barnX = distanceToScreenX(COURSE_LENGTH)
   const progressPercent = Math.min(100, (game.progress / COURSE_LENGTH) * 100)
   const sheepClass = [
     'sheep',
@@ -270,7 +271,11 @@ function GameScene({
         <LaneGuide top={50} label="normal" />
         <LaneGuide top={77} label="low" />
 
-        {visibleItems.map((item) => (
+        <div className="start-flag" style={{ left: `${distanceToScreenX(0)}%` }} aria-label="start">
+          🚩
+        </div>
+
+        {courseItems.map((item) => (
           <div
             key={item.id}
             className={`item item-${item.kind}`}
@@ -281,13 +286,11 @@ function GameScene({
           </div>
         ))}
 
-        {barnX < 110 && (
-          <div className="barn" style={{ left: `${barnX}%` }} aria-label="barn">
-            🏠
-          </div>
-        )}
+        <div className="barn" style={{ left: `${barnX}%` }} aria-label="barn">
+          🏠
+        </div>
 
-        <div className={sheepClass} style={{ left: `${SHEEP_SCREEN_X}%`, top: `${sheepTop}%` }}>
+        <div className={sheepClass} style={{ left: `${sheepX}%`, top: `${sheepTop}%` }}>
           <span className="baa-bubble">{input.label}</span>
           <span className="sheep-emoji">🐑</span>
         </div>

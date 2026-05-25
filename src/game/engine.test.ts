@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { COURSE_LENGTH, createInitialGameState, HIT_WINDOW, updateGameState } from './engine'
+import {
+  COURSE_END_X,
+  COURSE_LENGTH,
+  COURSE_START_X,
+  createInitialGameState,
+  distanceToScreenX,
+  HIT_WINDOW,
+  updateGameState,
+} from './engine'
 import type { GameItemKind, GameState, Lane } from '../types'
 
 function stateAtItem(kind: GameItemKind, lane: Lane = 0): GameState {
@@ -22,6 +30,12 @@ function stateAtItem(kind: GameItemKind, lane: Lane = 0): GameState {
 }
 
 describe('runner engine', () => {
+  it('maps the whole course into fixed screen coordinates', () => {
+    expect(distanceToScreenX(0)).toBe(COURSE_START_X)
+    expect(distanceToScreenX(COURSE_LENGTH)).toBe(COURSE_END_X)
+    expect(distanceToScreenX(COURSE_LENGTH / 2)).toBe((COURSE_START_X + COURSE_END_X) / 2)
+  })
+
   it('moves the sheep toward the requested target lane', () => {
     const state = createInitialGameState()
     const next = updateGameState(state, 1, 100)

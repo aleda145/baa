@@ -1,8 +1,8 @@
 import type { GameEvent, GameEventKind, GameItem, GameItemKind, GameState, Lane } from '../types'
 
 export const COURSE_LENGTH = 3000
-export const VIEW_DISTANCE = 720
-export const SHEEP_SCREEN_X = 18
+export const COURSE_START_X = 7
+export const COURSE_END_X = 93
 export const BASE_SPEED = 68
 export const HIT_WINDOW = 24
 
@@ -43,12 +43,18 @@ export function nearestLane(value: number): Lane {
   return 0
 }
 
+export function distanceToScreenX(distance: number): number {
+  const clampedDistance = Math.min(COURSE_LENGTH, Math.max(0, distance))
+  const courseWidth = COURSE_END_X - COURSE_START_X
+  return COURSE_START_X + (clampedDistance / COURSE_LENGTH) * courseWidth
+}
+
 export function makeCourseItems(): GameItem[] {
   const kinds: GameItemKind[] = ['fence', 'bell', 'mud', 'flower', 'wolf', 'hay']
   const items: GameItem[] = []
 
-  for (let i = 0; i < 25; i += 1) {
-    const distance = 260 + i * 105
+  for (let i = 0; i < 15; i += 1) {
+    const distance = 300 + i * 170
     const kind = kinds[i % kinds.length]
     const lane = laneOrder[(i + Math.floor(i / 3)) % laneOrder.length]
 
@@ -66,7 +72,7 @@ export function makeCourseItems(): GameItem[] {
     id: 'final-bell',
     kind: 'bell',
     lane: 0,
-    distance: COURSE_LENGTH - 240,
+    distance: COURSE_LENGTH - 160,
     collectedOrHit: false,
     missed: false,
   })
@@ -97,15 +103,14 @@ export function createInitialGameState(): GameState {
   }
 }
 
-export function getVisibleItems(state: GameState): Array<GameItem & { screenXPercent: number; emoji: string }> {
+export function getCourseItems(state: GameState): Array<GameItem & { screenXPercent: number; emoji: string }> {
   return state.items
     .filter((item) => !item.collectedOrHit && !item.missed)
     .map((item) => ({
       ...item,
-      screenXPercent: SHEEP_SCREEN_X + ((item.distance - state.progress) / VIEW_DISTANCE) * 100,
+      screenXPercent: distanceToScreenX(item.distance),
       emoji: getItemEmoji(item.kind),
     }))
-    .filter((item) => item.screenXPercent > -8 && item.screenXPercent < 110)
 }
 
 export function updateGameState(state: GameState, targetLane: Lane, dtMs: number): GameState {
