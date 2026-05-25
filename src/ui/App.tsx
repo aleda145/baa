@@ -22,6 +22,7 @@ const idleInput: InputState = {
   voiced: false,
   pitchHz: null,
   confidence: 0,
+  volume: 0,
   lane: 0,
   label: '?',
 }
@@ -262,6 +263,13 @@ function GameScene({
         <div>
           <span>Pitch</span>
           <strong>{input.pitchHz ? `${Math.round(input.pitchHz)} Hz` : '...'}</strong>
+        </div>
+        <div className="volume-card">
+          <span>Loudness</span>
+          <strong>{Math.round(input.volume * 100)}%</strong>
+          <div className="volume-meter" aria-label="baaah loudness">
+            <div className="volume-fill" style={{ width: `${Math.round(input.volume * 100)}%` }} />
+          </div>
         </div>
       </div>
 

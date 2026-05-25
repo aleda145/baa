@@ -5,16 +5,19 @@ export const HIGH_PITCH_RATIO = 1.18
 export const LOW_PITCH_RATIO = 0.85
 export const LANE_CHANGE_COOLDOWN_MS = 120
 export const PITCH_SMOOTHING = 0.35
+export const VOLUME_SMOOTHING = 0.28
 
 export type PitchFrame = {
   pitchHz: number | null
   confidence: number
+  volume: number
 }
 
 export type PitchLaneFilterState = {
   baselineHz: number
   lane: Lane
   smoothedPitchHz: number | null
+  smoothedVolume: number
   cooldownMs: number
 }
 
@@ -23,6 +26,7 @@ export function createPitchLaneFilter(baselineHz: number): PitchLaneFilterState 
     baselineHz,
     lane: 0,
     smoothedPitchHz: null,
+    smoothedVolume: 0,
     cooldownMs: 0,
   }
 }
@@ -56,6 +60,8 @@ export function updatePitchLaneFilter(
   const voiced = frame.pitchHz !== null && frame.confidence >= MIN_CONFIDENCE
   const nextCooldownMs = Math.max(0, state.cooldownMs - dtMs)
   let smoothedPitchHz = state.smoothedPitchHz
+  const smoothedVolume =
+    state.smoothedVolume * (1 - VOLUME_SMOOTHING) + frame.volume * VOLUME_SMOOTHING
 
   if (voiced && frame.pitchHz !== null) {
     smoothedPitchHz =
@@ -73,12 +79,14 @@ export function updatePitchLaneFilter(
 
   state.lane = lane
   state.smoothedPitchHz = smoothedPitchHz
+  state.smoothedVolume = smoothedVolume
   state.cooldownMs = lane !== previousLane ? LANE_CHANGE_COOLDOWN_MS : nextCooldownMs
 
   return {
     voiced,
     pitchHz: smoothedPitchHz,
     confidence: frame.confidence,
+    volume: smoothedVolume,
     lane,
     label: laneLabel(lane, voiced),
   }

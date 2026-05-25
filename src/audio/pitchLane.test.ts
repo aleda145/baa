@@ -16,10 +16,18 @@ describe('pitch lane classification', () => {
   it('smooths and rate limits lane changes', () => {
     const filter = createPitchLaneFilter(200)
 
-    const high = updatePitchLaneFilter(filter, { pitchHz: 255, confidence: 0.95 }, 200)
+    const high = updatePitchLaneFilter(filter, { pitchHz: 255, confidence: 0.95, volume: 0.4 }, 200)
     expect(high.lane).toBe(1)
 
-    const lowTooSoon = updatePitchLaneFilter(filter, { pitchHz: 130, confidence: 0.95 }, 16)
+    const lowTooSoon = updatePitchLaneFilter(filter, { pitchHz: 130, confidence: 0.95, volume: 0.4 }, 16)
     expect(lowTooSoon.lane).toBe(1)
+  })
+
+  it('reports smoothed volume without changing pitch classification rules', () => {
+    const filter = createPitchLaneFilter(200)
+    const quiet = updatePitchLaneFilter(filter, { pitchHz: null, confidence: 0, volume: 0.5 }, 16)
+
+    expect(quiet.lane).toBe(0)
+    expect(quiet.volume).toBeGreaterThan(0)
   })
 })

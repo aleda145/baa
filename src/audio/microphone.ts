@@ -5,6 +5,17 @@ const FFT_SIZE = 2048
 const MIN_PITCH_HZ = 65
 const MAX_PITCH_HZ = 1000
 
+export function calculateVolumeLevel(buffer: Float32Array): number {
+  let sumSquares = 0
+
+  for (const sample of buffer) {
+    sumSquares += sample * sample
+  }
+
+  const rms = Math.sqrt(sumSquares / buffer.length)
+  return Math.min(1, Math.max(0, (rms - 0.005) * 7))
+}
+
 export class MicrophonePitchController {
   private constructor(
     private readonly stream: MediaStream,
@@ -52,6 +63,7 @@ export class MicrophonePitchController {
   samplePitch(): PitchFrame {
     this.analyser.getFloatTimeDomainData(this.buffer)
     const [pitchHz, confidence] = this.detector.findPitch(this.buffer, this.audioContext.sampleRate)
+    const volume = calculateVolumeLevel(this.buffer)
 
     if (
       !Number.isFinite(pitchHz) ||
@@ -59,10 +71,10 @@ export class MicrophonePitchController {
       pitchHz > MAX_PITCH_HZ ||
       confidence < MIN_CONFIDENCE
     ) {
-      return { pitchHz: null, confidence }
+      return { pitchHz: null, confidence, volume }
     }
 
-    return { pitchHz, confidence }
+    return { pitchHz, confidence, volume }
   }
 
   async calibrate(durationMs = 1400): Promise<number | null> {

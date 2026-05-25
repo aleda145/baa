@@ -4,6 +4,7 @@ export type InputState = {
   voiced: boolean
   pitchHz: number | null
   confidence: number
+  volume: number
   lane: Lane
   label: 'BAA↑' | 'baa' | 'BAA↓' | '?'
 }

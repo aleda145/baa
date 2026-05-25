@@ -108,7 +108,7 @@ button {
   flex-wrap: wrap;
 }
 
-.hud div,
+.hud > div,
 .status-strip span {
   min-width: 108px;
   background: rgba(255, 255, 255, 0.76);
@@ -118,7 +118,7 @@ button {
   text-align: center;
 }
 
-.hud span {
+.hud > div > span {
   display: block;
   color: #526449;
   font-size: 12px;
@@ -126,10 +126,29 @@ button {
   text-transform: uppercase;
 }
 
-.hud strong {
+.hud > div > strong {
   display: block;
   font-size: 22px;
   line-height: 1.1;
+}
+
+.volume-card {
+  width: 150px;
+}
+
+.volume-meter {
+  height: 9px;
+  margin-top: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(82, 100, 73, 0.16);
+}
+
+.volume-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f9f46, #ffd24a, #dc4d36);
+  transition: width 80ms linear;
 }
 
 .course {
@@ -341,7 +360,7 @@ button {
     padding: 12px;
   }
 
-  .hud div {
+  .hud > div {
     min-width: 92px;
     padding: 7px 9px;
   }
