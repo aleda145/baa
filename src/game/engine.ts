@@ -3,7 +3,7 @@ import type { GameEvent, GameEventKind, GameItem, GameItemKind, GameState, Lane 
 export const COURSE_LENGTH = 3000
 export const COURSE_START_X = 7
 export const COURSE_END_X = 93
-export const BASE_SPEED = 68
+export const BASE_SPEED = 136
 export const HIT_WINDOW = 24
 
 const laneOrder: Lane[] = [1, 0, -1]

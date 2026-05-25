@@ -199,6 +199,7 @@ button {
 .sheep-emoji {
   display: block;
   transform-origin: 50% 70%;
+  scale: -1 1;
   animation: sheep-run 260ms ease-in-out infinite alternate;
 }
 
