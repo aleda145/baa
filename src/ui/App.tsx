@@ -1,0 +1,322 @@
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { MicrophonePitchController } from '../audio/microphone'
+import { createPitchLaneFilter, updatePitchLaneFilter } from '../audio/pitchLane'
+import {
+  COURSE_LENGTH,
+  SHEEP_SCREEN_X,
+  createInitialGameState,
+  getVisibleItems,
+  laneToPercent,
+  updateGameState,
+} from '../game/engine'
+import type { GameState, InputState } from '../types'
+
+type Screen = 'intro' | 'calibrate' | 'calibrating' | 'running' | 'results' | 'error'
+
+type Result = {
+  score: number
+  timeMs: number
+}
+
+const idleInput: InputState = {
+  voiced: false,
+  pitchHz: null,
+  confidence: 0,
+  lane: 0,
+  label: '?',
+}
+
+export function App() {
+  const micRef = useRef<MicrophonePitchController | null>(null)
+  const [screen, setScreen] = useState<Screen>('intro')
+  const [baselineHz, setBaselineHz] = useState<number | null>(null)
+  const [result, setResult] = useState<Result | null>(null)
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    return () => {
+      void micRef.current?.close()
+    }
+  }, [])
+
+  const requestMic = async () => {
+    setMessage('')
+    try {
+      micRef.current = await MicrophonePitchController.create()
+      setScreen('calibrate')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not open the microphone.')
+      setScreen('error')
+    }
+  }
+
+  const calibrate = async () => {
+    if (!micRef.current) return
+
+    setMessage('')
+    setScreen('calibrating')
+
+    const baseline = await micRef.current.calibrate()
+    if (baseline === null) {
+      setMessage('Could not hear a clear baaah. Try one steady normal baaah.')
+      setScreen('calibrate')
+      return
+    }
+
+    setBaselineHz(baseline)
+    setResult(null)
+    setScreen('running')
+  }
+
+  const retry = () => {
+    if (baselineHz === null) {
+      setScreen('calibrate')
+      return
+    }
+
+    setResult(null)
+    setScreen('running')
+  }
+
+  return (
+    <main className="app-shell">
+      {screen === 'intro' && (
+        <SetupPanel
+          title="Baaah"
+          eyebrow="🐑"
+          buttonLabel="Use microphone"
+          onPrimary={requestMic}
+        >
+          <p>Baa high to go up.</p>
+          <p>Baa low to go down.</p>
+          <p>Reach the barn.</p>
+        </SetupPanel>
+      )}
+
+      {screen === 'calibrate' && (
+        <SetupPanel
+          title="Normal baaah"
+          eyebrow="🎙️"
+          buttonLabel="Record normal baaah"
+          onPrimary={calibrate}
+          secondaryText={message}
+        >
+          <p>Say one steady, comfortable baaah.</p>
+          <p>This becomes the middle lane.</p>
+        </SetupPanel>
+      )}
+
+      {screen === 'calibrating' && (
+        <SetupPanel title="Listening..." eyebrow="👂" buttonLabel="Hold steady" disabled>
+          <p>Keep saying a normal baaah.</p>
+        </SetupPanel>
+      )}
+
+      {screen === 'running' && micRef.current && baselineHz !== null && (
+        <RunningGame
+          key={`${baselineHz}-${result?.timeMs ?? 0}-${screen}`}
+          baselineHz={baselineHz}
+          mic={micRef.current}
+          onFinish={(nextResult) => {
+            setResult(nextResult)
+            setScreen('results')
+          }}
+        />
+      )}
+
+      {screen === 'results' && result && (
+        <SetupPanel title="Barn reached" eyebrow="🏠" buttonLabel="Retry" onPrimary={retry}>
+          <p>Score: {result.score}</p>
+          <p>Time: {(result.timeMs / 1000).toFixed(1)}s</p>
+        </SetupPanel>
+      )}
+
+      {screen === 'error' && (
+        <SetupPanel title="Mic blocked" eyebrow="🎙️" buttonLabel="Try again" onPrimary={requestMic}>
+          <p>{message || 'The microphone is unavailable.'}</p>
+          <p>Use localhost or HTTPS and allow microphone access.</p>
+        </SetupPanel>
+      )}
+    </main>
+  )
+}
+
+function SetupPanel({
+  title,
+  eyebrow,
+  buttonLabel,
+  onPrimary,
+  disabled = false,
+  secondaryText = '',
+  children,
+}: {
+  title: string
+  eyebrow: string
+  buttonLabel: string
+  onPrimary?: () => void
+  disabled?: boolean
+  secondaryText?: string
+  children: ReactNode
+}) {
+  return (
+    <section className="setup-screen">
+      <div className="setup-mark" aria-hidden="true">
+        {eyebrow}
+      </div>
+      <h1>{title}</h1>
+      <div className="setup-copy">{children}</div>
+      <button className="primary-button" disabled={disabled} onClick={onPrimary}>
+        {buttonLabel}
+      </button>
+      {secondaryText && <p className="setup-note">{secondaryText}</p>}
+    </section>
+  )
+}
+
+function RunningGame({
+  baselineHz,
+  mic,
+  onFinish,
+}: {
+  baselineHz: number
+  mic: MicrophonePitchController
+  onFinish: (result: Result) => void
+}) {
+  const gameRef = useRef<GameState>(createInitialGameState())
+  const filterRef = useRef(createPitchLaneFilter(baselineHz))
+  const lastTimeRef = useRef<number | null>(null)
+  const finishedRef = useRef(false)
+  const [game, setGame] = useState(gameRef.current)
+  const [input, setInput] = useState<InputState>(idleInput)
+
+  useEffect(() => {
+    let animationFrame = 0
+
+    const tick = (now: number) => {
+      const last = lastTimeRef.current ?? now
+      const dtMs = Math.min(50, now - last)
+      lastTimeRef.current = now
+
+      const pitchFrame = mic.samplePitch()
+      const nextInput = updatePitchLaneFilter(filterRef.current, pitchFrame, dtMs)
+      const nextGame = updateGameState(gameRef.current, nextInput.lane, dtMs)
+
+      gameRef.current = nextGame
+      setInput(nextInput)
+      setGame(nextGame)
+
+      if (nextGame.finished && !finishedRef.current) {
+        finishedRef.current = true
+        onFinish({
+          score: nextGame.sheep.score,
+          timeMs: nextGame.finishTimeMs ?? nextGame.elapsedMs,
+        })
+        return
+      }
+
+      animationFrame = requestAnimationFrame(tick)
+    }
+
+    animationFrame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(animationFrame)
+  }, [mic, onFinish])
+
+  return <GameScene game={game} input={input} baselineHz={baselineHz} />
+}
+
+function GameScene({
+  game,
+  input,
+  baselineHz,
+}: {
+  game: GameState
+  input: InputState
+  baselineHz: number
+}) {
+  const sheepTop = laneToPercent(game.sheep.lanePosition)
+  const visibleItems = getVisibleItems(game)
+  const barnX = SHEEP_SCREEN_X + ((COURSE_LENGTH - game.progress) / 720) * 100
+  const progressPercent = Math.min(100, (game.progress / COURSE_LENGTH) * 100)
+  const sheepClass = [
+    'sheep',
+    input.lane === 1 ? 'sheep-high' : '',
+    input.lane === -1 ? 'sheep-low' : '',
+    game.sheep.tumbleMs > 0 ? 'sheep-tumble' : '',
+    !input.voiced ? 'sheep-confused' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <section className="game-screen">
+      <div className="hud">
+        <div>
+          <span>Score</span>
+          <strong>{game.sheep.score}</strong>
+        </div>
+        <div>
+          <span>Time</span>
+          <strong>{(game.elapsedMs / 1000).toFixed(1)}s</strong>
+        </div>
+        <div>
+          <span>Pitch</span>
+          <strong>{input.pitchHz ? `${Math.round(input.pitchHz)} Hz` : '...'}</strong>
+        </div>
+      </div>
+
+      <div className="course" aria-label="Baaah runner course">
+        <div className="skyline">☁️ ☁️ ☁️</div>
+        <LaneGuide top={23} label="high" />
+        <LaneGuide top={50} label="normal" />
+        <LaneGuide top={77} label="low" />
+
+        {visibleItems.map((item) => (
+          <div
+            key={item.id}
+            className={`item item-${item.kind}`}
+            style={{ left: `${item.screenXPercent}%`, top: `${laneToPercent(item.lane)}%` }}
+            aria-label={item.kind}
+          >
+            {item.emoji}
+          </div>
+        ))}
+
+        {barnX < 110 && (
+          <div className="barn" style={{ left: `${barnX}%` }} aria-label="barn">
+            🏠
+          </div>
+        )}
+
+        <div className={sheepClass} style={{ left: `${SHEEP_SCREEN_X}%`, top: `${sheepTop}%` }}>
+          <span className="baa-bubble">{input.label}</span>
+          <span className="sheep-emoji">🐑</span>
+        </div>
+
+        <div className="events">
+          {game.events.map((event) => (
+            <span key={event.id}>{event.message}</span>
+          ))}
+        </div>
+      </div>
+
+      <div className="progress-shell" aria-label="course progress">
+        <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
+      </div>
+
+      <div className="status-strip">
+        <span>baseline {Math.round(baselineHz)} Hz</span>
+        {game.sheep.slowedMs > 0 && <span>mud slow</span>}
+        {game.sheep.boostMs > 0 && <span>hay boost</span>}
+        {game.sheep.stunnedMs > 0 && <span>dizzy</span>}
+      </div>
+    </section>
+  )
+}
+
+function LaneGuide({ top, label }: { top: number; label: string }) {
+  return (
+    <div className="lane-guide" style={{ top: `${top}%` }}>
+      <span>{label}</span>
+    </div>
+  )
+}

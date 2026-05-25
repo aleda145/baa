@@ -1,0 +1,360 @@
+:root {
+  color: #182015;
+  background: #e7f7d7;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(127, 207, 234, 0.78) 0%, rgba(232, 248, 211, 0.9) 48%),
+    radial-gradient(circle at 20% 12%, rgba(255, 255, 255, 0.8), transparent 18rem),
+    #d7f0b6;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.setup-screen {
+  width: min(560px, 100%);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.78);
+  border: 3px solid rgba(56, 99, 45, 0.16);
+  border-radius: 8px;
+  padding: clamp(28px, 7vw, 56px);
+  box-shadow: 0 18px 50px rgba(42, 80, 34, 0.16);
+}
+
+.setup-mark {
+  font-size: clamp(54px, 12vw, 92px);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.setup-screen h1 {
+  font-size: clamp(48px, 12vw, 86px);
+  line-height: 0.92;
+  margin: 0 0 22px;
+}
+
+.setup-copy {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+
+.setup-copy p,
+.setup-note {
+  margin: 0;
+  font-size: clamp(18px, 4.5vw, 26px);
+  line-height: 1.25;
+}
+
+.setup-note {
+  margin-top: 18px;
+  color: #9b2f24;
+}
+
+.primary-button {
+  border: 0;
+  background: #225c3a;
+  color: #fffdf3;
+  min-height: 52px;
+  padding: 0 26px;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #12341f;
+}
+
+.primary-button:active {
+  transform: translateY(3px);
+  box-shadow: 0 3px 0 #12341f;
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.game-screen {
+  width: min(1100px, 100%);
+  display: grid;
+  gap: 14px;
+}
+
+.hud,
+.status-strip {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hud div,
+.status-strip span {
+  min-width: 108px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 2px solid rgba(56, 99, 45, 0.14);
+  border-radius: 8px;
+  padding: 9px 12px;
+  text-align: center;
+}
+
+.hud span {
+  display: block;
+  color: #526449;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.hud strong {
+  display: block;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.course {
+  position: relative;
+  overflow: hidden;
+  height: clamp(390px, 62vh, 620px);
+  border: 4px solid rgba(42, 89, 36, 0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(128, 210, 241, 0.75) 0 32%, transparent 32%),
+    repeating-linear-gradient(0deg, rgba(89, 150, 70, 0.16) 0 2px, transparent 2px 56px),
+    linear-gradient(180deg, #8ecf72 0%, #63ab55 100%);
+  box-shadow: inset 0 -24px 0 rgba(51, 111, 43, 0.16);
+}
+
+.skyline {
+  position: absolute;
+  left: 12%;
+  right: 0;
+  top: 7%;
+  font-size: 34px;
+  opacity: 0.84;
+  word-spacing: 18vw;
+  white-space: nowrap;
+  animation: cloud-slide 14s linear infinite;
+}
+
+.lane-guide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 3px dashed rgba(255, 255, 255, 0.62);
+}
+
+.lane-guide span {
+  position: absolute;
+  left: 10px;
+  top: -30px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.64);
+  color: #49623d;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sheep,
+.item,
+.barn {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  will-change: transform, top, left;
+  user-select: none;
+}
+
+.sheep {
+  z-index: 5;
+  font-size: clamp(48px, 9vw, 88px);
+  transition: top 130ms linear;
+  filter: drop-shadow(0 8px 0 rgba(33, 68, 28, 0.15));
+}
+
+.sheep-emoji {
+  display: block;
+  transform-origin: 50% 70%;
+  animation: sheep-run 260ms ease-in-out infinite alternate;
+}
+
+.sheep-high .sheep-emoji {
+  transform: scaleY(1.16) scaleX(0.92);
+}
+
+.sheep-low .sheep-emoji {
+  transform: scaleY(0.84) scaleX(1.16);
+}
+
+.sheep-confused .sheep-emoji {
+  filter: saturate(0.75);
+}
+
+.sheep-tumble .sheep-emoji {
+  animation: tumble 420ms linear infinite;
+}
+
+.baa-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: 82%;
+  transform: translateX(-50%);
+  padding: 5px 10px;
+  min-width: 52px;
+  text-align: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 2px solid rgba(42, 89, 36, 0.16);
+  font-size: 16px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.item {
+  z-index: 4;
+  font-size: clamp(34px, 6vw, 58px);
+  transition: left 50ms linear;
+  filter: drop-shadow(0 6px 0 rgba(33, 68, 28, 0.16));
+}
+
+.item-mud {
+  transform: translate(-50%, -28%);
+}
+
+.item-bell,
+.item-flower {
+  animation: bob 680ms ease-in-out infinite alternate;
+}
+
+.barn {
+  top: 50%;
+  z-index: 3;
+  font-size: clamp(78px, 15vw, 150px);
+  transition: left 50ms linear;
+  filter: drop-shadow(0 10px 0 rgba(33, 68, 28, 0.18));
+}
+
+.events {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+
+.events span {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 253, 230, 0.9);
+  border: 2px solid rgba(42, 89, 36, 0.16);
+  font-weight: 900;
+  animation: pop 400ms ease-out;
+}
+
+.progress-shell {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.66);
+  border: 2px solid rgba(56, 99, 45, 0.18);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #225c3a;
+  transition: width 80ms linear;
+}
+
+.status-strip {
+  min-height: 42px;
+}
+
+.status-strip span {
+  min-width: auto;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+@keyframes sheep-run {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 0 -4px;
+  }
+}
+
+@keyframes tumble {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes bob {
+  to {
+    translate: 0 -7px;
+  }
+}
+
+@keyframes pop {
+  from {
+    scale: 0.86;
+    opacity: 0;
+  }
+}
+
+@keyframes cloud-slide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-28%);
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 12px;
+  }
+
+  .hud div {
+    min-width: 92px;
+    padding: 7px 9px;
+  }
+
+  .hud strong {
+    font-size: 18px;
+  }
+
+  .course {
+    height: 68vh;
+  }
+
+  .lane-guide span {
+    font-size: 11px;
+  }
+}
