@@ -8,6 +8,14 @@ import {
 } from './pitchLane'
 
 const FFT_SIZE = 2048
+const CALIBRATION_HOLD_MS = 500
+const CALIBRATION_TIMEOUT_MS = 9000
+
+type CalibrationOptions = {
+  holdMs?: number
+  timeoutMs?: number
+  onProgress?: (progress: number) => void
+}
 
 export function calculateVolumeLevel(buffer: Float32Array): number {
   let sumSquares = 0
@@ -81,20 +89,41 @@ export class MicrophonePitchController {
     return { pitchHz, confidence, volume }
   }
 
-  async calibrate(timeoutMs = 3500): Promise<number | null> {
+  async calibrate({
+    holdMs = CALIBRATION_HOLD_MS,
+    timeoutMs = CALIBRATION_TIMEOUT_MS,
+    onProgress,
+  }: CalibrationOptions = {}): Promise<number | null> {
     await this.resume()
 
     return new Promise((resolve) => {
       const startedAt = performance.now()
+      let lastTickAt = startedAt
+      let heldMs = 0
+      let pitches: number[] = []
 
       const tick = () => {
+        const now = performance.now()
+        const dtMs = now - lastTickAt
+        lastTickAt = now
         const frame = this.samplePitch()
+
         if (frame.pitchHz !== null && frame.volume >= MIN_CONTROL_VOLUME) {
-          resolve(frame.pitchHz)
+          heldMs += dtMs
+          pitches.push(frame.pitchHz)
+        } else {
+          heldMs = 0
+          pitches = []
+        }
+
+        onProgress?.(Math.min(1, heldMs / holdMs))
+
+        if (heldMs >= holdMs) {
+          resolve(median(pitches))
           return
         }
 
-        if (performance.now() - startedAt >= timeoutMs) {
+        if (now - startedAt >= timeoutMs) {
           resolve(null)
           return
         }
@@ -112,4 +141,9 @@ export class MicrophonePitchController {
       await this.audioContext.close()
     }
   }
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b)
+  return sorted[Math.floor(sorted.length / 2)]
 }

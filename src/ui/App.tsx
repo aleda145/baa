@@ -26,6 +26,7 @@ export function App() {
   const micRef = useRef<MicrophonePitchController | null>(null)
   const [screen, setScreen] = useState<Screen>('intro')
   const [measuredBaseHz, setMeasuredBaseHz] = useState<number | null>(null)
+  const [calibrationProgress, setCalibrationProgress] = useState(0)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -49,15 +50,20 @@ export function App() {
     if (!micRef.current) return
 
     setMessage('')
+    setCalibrationProgress(0)
     setScreen('calibrating')
 
-    const baseHz = await micRef.current.calibrate()
+    const baseHz = await micRef.current.calibrate({
+      onProgress: setCalibrationProgress,
+    })
     if (baseHz === null) {
-      setMessage('Could not hear baaah. Say baaah.')
+      setCalibrationProgress(0)
+      setMessage('Say baaah')
       setScreen('calibrate')
       return
     }
 
+    setCalibrationProgress(1)
     setMeasuredBaseHz(baseHz)
     setScreen('running')
   }
@@ -99,6 +105,7 @@ export function App() {
       {screen === 'calibrating' && (
         <SetupPanel title="Say baaah" eyebrow="👂" buttonLabel="..." disabled>
           <p>Say baaah</p>
+          <HoldMeter progress={calibrationProgress} />
         </SetupPanel>
       )}
 
@@ -158,6 +165,14 @@ function SetupPanel({
       </button>
       {secondaryText && <p className="setup-note">{secondaryText}</p>}
     </section>
+  )
+}
+
+function HoldMeter({ progress }: { progress: number }) {
+  return (
+    <div className="hold-meter" aria-label="baaah hold progress">
+      <div className="hold-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+    </div>
   )
 }
 
