@@ -6,11 +6,12 @@ import {
   createInitialGameState,
   distanceToScreenX,
   HIT_WINDOW,
+  makeCourseItems,
   updateGameState,
 } from './engine'
-import type { GameItemKind, GameState, Lane } from '../types'
+import type { GameState, Lane } from '../types'
 
-function stateAtItem(kind: GameItemKind, lane: Lane = 0): GameState {
+function stateAtWolf(lane: Lane = 0): GameState {
   const state = createInitialGameState()
   state.progress = 100
   state.sheep.lane = lane
@@ -18,8 +19,8 @@ function stateAtItem(kind: GameItemKind, lane: Lane = 0): GameState {
   state.sheep.targetLane = lane
   state.items = [
     {
-      id: kind,
-      kind,
+      id: 'wolf',
+      kind: 'wolf',
       lane,
       distance: state.progress + HIT_WINDOW - 1,
       collectedOrHit: false,
@@ -36,6 +37,14 @@ describe('runner engine', () => {
     expect(distanceToScreenX(COURSE_LENGTH / 2)).toBe((COURSE_START_X + COURSE_END_X) / 2)
   })
 
+  it('generates wolves only', () => {
+    const items = makeCourseItems()
+
+    expect(items).toHaveLength(3)
+    expect(items.every((item) => item.kind === 'wolf')).toBe(true)
+    expect(items.map((item) => item.lane).sort()).toEqual([-1, 0, 1])
+  })
+
   it('moves the sheep toward the requested target lane', () => {
     const state = createInitialGameState()
     const next = updateGameState(state, 1, 100)
@@ -46,29 +55,28 @@ describe('runner engine', () => {
   })
 
   it('only collides with items in the sheep lane', () => {
-    const state = stateAtItem('fence', 1)
+    const state = stateAtWolf(1)
     state.sheep.lane = 0
     state.sheep.lanePosition = 0
 
     const next = updateGameState(state, 0, 16)
 
     expect(next.items[0].collectedOrHit).toBe(false)
-    expect(next.sheep.tumbleMs).toBe(0)
+    expect(next.finished).toBe(false)
   })
 
-  it('applies obstacle penalties and collectible rewards', () => {
-    const fence = updateGameState(stateAtItem('fence'), 0, 16)
-    expect(fence.items[0].collectedOrHit).toBe(true)
-    expect(fence.sheep.stunnedMs).toBeGreaterThan(0)
+  it('resets to the start when the sheep hits a wolf', () => {
+    const next = updateGameState(stateAtWolf(), 0, 16)
 
-    const bell = updateGameState(stateAtItem('bell'), 0, 16)
-    expect(bell.sheep.score).toBeGreaterThanOrEqual(100)
-
-    const hay = updateGameState(stateAtItem('hay'), 0, 16)
-    expect(hay.sheep.boostMs).toBeGreaterThan(0)
+    expect(next.finished).toBe(false)
+    expect(next.outcome).toBe('running')
+    expect(next.progress).toBe(0)
+    expect(next.sheep.lane).toBe(0)
+    expect(next.sheep.blinkMs).toBeGreaterThan(0)
+    expect(next.items).toHaveLength(3)
   })
 
-  it('finishes at the barn and awards a completion bonus', () => {
+  it('wins when the sheep reaches the barn', () => {
     const state = createInitialGameState()
     state.progress = COURSE_LENGTH - 1
     state.items = []
@@ -76,8 +84,8 @@ describe('runner engine', () => {
     const next = updateGameState(state, 0, 1000)
 
     expect(next.finished).toBe(true)
+    expect(next.outcome).toBe('won')
     expect(next.finishTimeMs).not.toBeNull()
     expect(next.progress).toBe(COURSE_LENGTH)
-    expect(next.sheep.score).toBeGreaterThan(0)
   })
 })

@@ -13,11 +13,6 @@ import type { GameState, InputState } from '../types'
 
 type Screen = 'intro' | 'calibrate' | 'calibrating' | 'running' | 'results' | 'error'
 
-type Result = {
-  score: number
-  timeMs: number
-}
-
 const idleInput: InputState = {
   voiced: false,
   pitchHz: null,
@@ -31,7 +26,6 @@ export function App() {
   const micRef = useRef<MicrophonePitchController | null>(null)
   const [screen, setScreen] = useState<Screen>('intro')
   const [baselineHz, setBaselineHz] = useState<number | null>(null)
-  const [result, setResult] = useState<Result | null>(null)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -65,7 +59,6 @@ export function App() {
     }
 
     setBaselineHz(baseline)
-    setResult(null)
     setScreen('running')
   }
 
@@ -75,7 +68,6 @@ export function App() {
       return
     }
 
-    setResult(null)
     setScreen('running')
   }
 
@@ -115,20 +107,18 @@ export function App() {
 
       {screen === 'running' && micRef.current && baselineHz !== null && (
         <RunningGame
-          key={`${baselineHz}-${result?.timeMs ?? 0}-${screen}`}
+          key={`${baselineHz}-${screen}`}
           baselineHz={baselineHz}
           mic={micRef.current}
-          onFinish={(nextResult) => {
-            setResult(nextResult)
+          onFinish={() => {
             setScreen('results')
           }}
         />
       )}
 
-      {screen === 'results' && result && (
+      {screen === 'results' && (
         <SetupPanel title="Barn reached" eyebrow="🏠" buttonLabel="Retry" onPrimary={retry}>
-          <p>Score: {result.score}</p>
-          <p>Time: {(result.timeMs / 1000).toFixed(1)}s</p>
+          <p>The sheep made it home.</p>
         </SetupPanel>
       )}
 
@@ -181,7 +171,7 @@ function RunningGame({
 }: {
   baselineHz: number
   mic: MicrophonePitchController
-  onFinish: (result: Result) => void
+  onFinish: () => void
 }) {
   const gameRef = useRef<GameState>(createInitialGameState())
   const filterRef = useRef(createPitchLaneFilter(baselineHz))
@@ -208,10 +198,7 @@ function RunningGame({
 
       if (nextGame.finished && !finishedRef.current) {
         finishedRef.current = true
-        onFinish({
-          score: nextGame.sheep.score,
-          timeMs: nextGame.finishTimeMs ?? nextGame.elapsedMs,
-        })
+        onFinish()
         return
       }
 
@@ -244,6 +231,7 @@ function GameScene({
     input.lane === 1 ? 'sheep-high' : '',
     input.lane === -1 ? 'sheep-low' : '',
     game.sheep.tumbleMs > 0 ? 'sheep-tumble' : '',
+    game.sheep.blinkMs > 0 ? 'sheep-blink' : '',
     !input.voiced ? 'sheep-confused' : '',
   ]
     .filter(Boolean)
@@ -252,14 +240,6 @@ function GameScene({
   return (
     <section className="game-screen">
       <div className="hud">
-        <div>
-          <span>Score</span>
-          <strong>{game.sheep.score}</strong>
-        </div>
-        <div>
-          <span>Time</span>
-          <strong>{(game.elapsedMs / 1000).toFixed(1)}s</strong>
-        </div>
         <div>
           <span>Pitch</span>
           <strong>{input.pitchHz ? `${Math.round(input.pitchHz)} Hz` : '...'}</strong>
@@ -316,9 +296,6 @@ function GameScene({
 
       <div className="status-strip">
         <span>baseline {Math.round(baselineHz)} Hz</span>
-        {game.sheep.slowedMs > 0 && <span>mud slow</span>}
-        {game.sheep.boostMs > 0 && <span>hay boost</span>}
-        {game.sheep.stunnedMs > 0 && <span>dizzy</span>}
       </div>
     </section>
   )

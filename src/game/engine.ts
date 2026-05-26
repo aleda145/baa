@@ -9,21 +9,11 @@ export const HIT_WINDOW = 24
 const laneOrder: Lane[] = [1, 0, -1]
 
 const itemEmoji: Record<GameItemKind, string> = {
-  fence: '🚧',
-  mud: '🟫',
   wolf: '🐺',
-  bell: '🔔',
-  hay: '🌾',
-  flower: '🌼',
 }
 
 const eventMessages: Record<GameEventKind, string> = {
-  'fence-hit': 'bonk!',
-  'mud-hit': 'squelch',
-  'wolf-hit': 'eep!',
-  bell: '+100',
-  hay: 'zoom',
-  flower: 'combo',
+  'wolf-hit': 'back!',
   finish: 'barn!',
 }
 
@@ -50,34 +40,18 @@ export function distanceToScreenX(distance: number): number {
 }
 
 export function makeCourseItems(): GameItem[] {
-  const kinds: GameItemKind[] = ['fence', 'bell', 'mud', 'flower', 'wolf', 'hay']
-  const items: GameItem[] = []
+  const wolves: Array<{ id: string; lane: Lane; distance: number }> = [
+    { id: 'wolf-top', lane: 1, distance: 920 },
+    { id: 'wolf-bottom', lane: -1, distance: 1700 },
+    { id: 'wolf-middle', lane: 0, distance: 2440 },
+  ]
 
-  for (let i = 0; i < 15; i += 1) {
-    const distance = 300 + i * 170
-    const kind = kinds[i % kinds.length]
-    const lane = laneOrder[(i + Math.floor(i / 3)) % laneOrder.length]
-
-    items.push({
-      id: `${kind}-${i}`,
-      kind,
-      lane,
-      distance,
-      collectedOrHit: false,
-      missed: false,
-    })
-  }
-
-  items.push({
-    id: 'final-bell',
-    kind: 'bell',
-    lane: 0,
-    distance: COURSE_LENGTH - 160,
+  return wolves.map((wolf) => ({
+    ...wolf,
+    kind: 'wolf',
     collectedOrHit: false,
     missed: false,
-  })
-
-  return items
+  }))
 }
 
 export function createInitialGameState(): GameState {
@@ -85,18 +59,15 @@ export function createInitialGameState(): GameState {
     elapsedMs: 0,
     progress: 0,
     finished: false,
+    outcome: 'running',
     finishTimeMs: null,
     sheep: {
       lane: 0,
       targetLane: 0,
       lanePosition: 0,
       speed: BASE_SPEED,
-      stunnedMs: 0,
-      slowedMs: 0,
-      boostMs: 0,
       tumbleMs: 0,
-      score: 0,
-      combo: 0,
+      blinkMs: 0,
     },
     items: makeCourseItems(),
     events: [],
@@ -124,30 +95,20 @@ export function updateGameState(state: GameState, targetLane: Lane, dtMs: number
     events: state.events.filter((event) => state.elapsedMs + dtMs - event.createdAtMs < 1200),
   }
 
-  next.sheep.stunnedMs = Math.max(0, next.sheep.stunnedMs - dtMs)
-  next.sheep.slowedMs = Math.max(0, next.sheep.slowedMs - dtMs)
-  next.sheep.boostMs = Math.max(0, next.sheep.boostMs - dtMs)
   next.sheep.tumbleMs = Math.max(0, next.sheep.tumbleMs - dtMs)
+  next.sheep.blinkMs = Math.max(0, next.sheep.blinkMs - dtMs)
 
   const laneEase = Math.min(1, dtMs / 150)
   next.sheep.lanePosition += (targetLane - next.sheep.lanePosition) * laneEase
   next.sheep.lane = nearestLane(next.sheep.lanePosition)
 
-  let speed = BASE_SPEED
-  if (next.sheep.slowedMs > 0) speed *= 0.62
-  if (next.sheep.boostMs > 0) speed *= 1.45
-  if (next.sheep.stunnedMs > 0) speed *= 0.18
-
-  next.sheep.speed = speed
-  next.progress += (speed * dtMs) / 1000
+  next.sheep.speed = BASE_SPEED
+  next.progress += (BASE_SPEED * dtMs) / 1000
 
   for (const item of next.items) {
     const passed = item.distance < next.progress - HIT_WINDOW
     if (!item.collectedOrHit && !item.missed && passed) {
       item.missed = true
-      if (item.kind === 'bell' || item.kind === 'flower') {
-        next.sheep.combo = 0
-      }
     }
 
     const canCollide =
@@ -157,65 +118,27 @@ export function updateGameState(state: GameState, targetLane: Lane, dtMs: number
       Math.abs(item.distance - next.progress) <= HIT_WINDOW
 
     if (canCollide) {
-      item.collectedOrHit = true
-      applyItemEffect(next, item.kind)
+      next.progress = 0
+      next.items = makeCourseItems()
+      next.sheep.lane = 0
+      next.sheep.targetLane = 0
+      next.sheep.lanePosition = 0
+      next.sheep.tumbleMs = 900
+      next.sheep.blinkMs = 1200
+      addEvent(next, 'wolf-hit')
+      return next
     }
   }
 
   if (next.progress >= COURSE_LENGTH) {
     next.finished = true
+    next.outcome = 'won'
     next.finishTimeMs = next.elapsedMs
     next.progress = COURSE_LENGTH
-    next.sheep.score += Math.max(0, Math.round(1500 - next.elapsedMs / 60))
     addEvent(next, 'finish')
   }
 
   return next
-}
-
-function applyItemEffect(state: GameState, kind: GameItemKind): void {
-  if (kind === 'fence') {
-    state.sheep.tumbleMs = 700
-    state.sheep.stunnedMs = Math.max(state.sheep.stunnedMs, 450)
-    state.sheep.combo = 0
-    state.sheep.score = Math.max(0, state.sheep.score - 25)
-    addEvent(state, 'fence-hit')
-    return
-  }
-
-  if (kind === 'mud') {
-    state.sheep.slowedMs = Math.max(state.sheep.slowedMs, 1700)
-    state.sheep.combo = 0
-    addEvent(state, 'mud-hit')
-    return
-  }
-
-  if (kind === 'wolf') {
-    state.sheep.stunnedMs = Math.max(state.sheep.stunnedMs, 900)
-    state.sheep.tumbleMs = 450
-    state.progress = Math.max(0, state.progress - 35)
-    state.sheep.combo = 0
-    addEvent(state, 'wolf-hit')
-    return
-  }
-
-  if (kind === 'bell') {
-    state.sheep.combo += 1
-    state.sheep.score += 100 + state.sheep.combo * 10
-    addEvent(state, 'bell')
-    return
-  }
-
-  if (kind === 'hay') {
-    state.sheep.boostMs = Math.max(state.sheep.boostMs, 1800)
-    state.sheep.score += 35
-    addEvent(state, 'hay')
-    return
-  }
-
-  state.sheep.combo += 1
-  state.sheep.score += 60 + state.sheep.combo * 15
-  addEvent(state, 'flower')
 }
 
 function addEvent(state: GameState, kind: GameEventKind): void {

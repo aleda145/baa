@@ -30,4 +30,15 @@ describe('pitch lane classification', () => {
     expect(quiet.lane).toBe(0)
     expect(quiet.volume).toBeGreaterThan(0)
   })
+
+  it('does not change lanes when loudness is too low', () => {
+    const filter = createPitchLaneFilter(200)
+    filter.lane = -1
+
+    const quietHigh = updatePitchLaneFilter(filter, { pitchHz: 270, confidence: 0.96, volume: 0.02 }, 200)
+
+    expect(quietHigh.lane).toBe(-1)
+    expect(quietHigh.voiced).toBe(false)
+    expect(quietHigh.label).toBe('?')
+  })
 })

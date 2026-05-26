@@ -238,6 +238,10 @@ button {
   animation: tumble 420ms linear infinite;
 }
 
+.sheep-blink {
+  animation: blink 140ms steps(2, end) infinite;
+}
+
 .baa-bubble {
   position: absolute;
   left: 50%;
@@ -258,15 +262,6 @@ button {
   z-index: 4;
   font-size: clamp(20px, 3.5vw, 40px);
   filter: drop-shadow(0 6px 0 rgba(33, 68, 28, 0.16));
-}
-
-.item-mud {
-  transform: translate(-50%, -28%);
-}
-
-.item-bell,
-.item-flower {
-  animation: bob 680ms ease-in-out infinite alternate;
 }
 
 .barn {
@@ -352,6 +347,12 @@ button {
   from {
     scale: 0.86;
     opacity: 0;
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.28;
   }
 }
 

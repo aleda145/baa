@@ -14,15 +14,11 @@ export type SheepState = {
   targetLane: Lane
   lanePosition: number
   speed: number
-  stunnedMs: number
-  slowedMs: number
-  boostMs: number
   tumbleMs: number
-  score: number
-  combo: number
+  blinkMs: number
 }
 
-export type GameItemKind = 'fence' | 'mud' | 'wolf' | 'bell' | 'hay' | 'flower'
+export type GameItemKind = 'wolf'
 
 export type GameItem = {
   id: string
@@ -34,12 +30,7 @@ export type GameItem = {
 }
 
 export type GameEventKind =
-  | 'fence-hit'
-  | 'mud-hit'
   | 'wolf-hit'
-  | 'bell'
-  | 'hay'
-  | 'flower'
   | 'finish'
 
 export type GameEvent = {
@@ -53,6 +44,7 @@ export type GameState = {
   elapsedMs: number
   progress: number
   finished: boolean
+  outcome: 'running' | 'won'
   finishTimeMs: number | null
   sheep: SheepState
   items: GameItem[]
