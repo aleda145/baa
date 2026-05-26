@@ -260,10 +260,6 @@ function GameScene({
         <LaneGuide top={50} />
         <LaneGuide top={77} />
 
-        <div className="start-flag" style={{ left: `${distanceToScreenX(0)}%` }} aria-label="start">
-          🚩
-        </div>
-
         {courseItems.map((item) => (
           <div
             key={item.id}
