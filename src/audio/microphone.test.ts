@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateVolumeLevel } from './microphone'
+import { calculateVoicedThresholdRms, calculateVolumeLevel } from './microphone'
 
 describe('microphone volume', () => {
   it('maps silence to zero loudness', () => {
@@ -12,5 +12,11 @@ describe('microphone volume', () => {
 
     expect(loud).toBeGreaterThan(quiet)
     expect(loud).toBeLessThanOrEqual(1)
+  })
+
+  it('calculates and clamps adaptive voiced thresholds', () => {
+    expect(calculateVoicedThresholdRms(0.002, 0.022)).toBeCloseTo(0.009)
+    expect(calculateVoicedThresholdRms(0, 0.001)).toBe(0.003)
+    expect(calculateVoicedThresholdRms(0.02, 0.2)).toBe(0.03)
   })
 })

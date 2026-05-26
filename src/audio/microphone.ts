@@ -2,7 +2,6 @@ import { PitchDetector } from 'pitchy'
 import {
   MAX_PITCH_HZ,
   MIN_CONFIDENCE,
-  MIN_CONTROL_VOLUME,
   MIN_PITCH_HZ,
   type PitchFrame,
 } from './pitchLane'
@@ -10,6 +9,8 @@ import {
 const FFT_SIZE = 2048
 const CALIBRATION_HOLD_MS = 500
 const CALIBRATION_TIMEOUT_MS = 9000
+const MIN_VOICED_THRESHOLD_RMS = 0.003
+const MAX_VOICED_THRESHOLD_RMS = 0.03
 
 type CalibrationOptions = {
   holdMs?: number
@@ -17,17 +18,33 @@ type CalibrationOptions = {
   onProgress?: (progress: number) => void
 }
 
+export type CalibrationResult = {
+  measuredBaseHz: number
+  voicedThresholdRms: number
+  noiseFloorRms: number
+  baaahRms: number
+}
+
 type AudioContextConstructor = typeof AudioContext
 
-export function calculateVolumeLevel(buffer: Float32Array): number {
+export function calculateRms(buffer: Float32Array): number {
   let sumSquares = 0
 
   for (const sample of buffer) {
     sumSquares += sample * sample
   }
 
-  const rms = Math.sqrt(sumSquares / buffer.length)
+  return Math.sqrt(sumSquares / buffer.length)
+}
+
+export function calculateVolumeLevel(buffer: Float32Array): number {
+  const rms = calculateRms(buffer)
   return Math.min(1, Math.max(0, (rms - 0.005) * 7))
+}
+
+export function calculateVoicedThresholdRms(noiseFloorRms: number, baaahRms: number): number {
+  const threshold = noiseFloorRms + (baaahRms - noiseFloorRms) * 0.35
+  return Math.min(MAX_VOICED_THRESHOLD_RMS, Math.max(MIN_VOICED_THRESHOLD_RMS, threshold))
 }
 
 export class MicrophonePitchController {
@@ -50,9 +67,13 @@ export class MicrophonePitchController {
     const audioContext = new AudioContextClass()
     await resumeAudioContext(audioContext)
 
+    const supportedConstraints = navigator.mediaDevices.getSupportedConstraints()
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
+      audio: makeAudioConstraints(supportedConstraints),
     })
+    const [track] = stream.getAudioTracks()
+    console.info('Baaah supported media constraints', supportedConstraints)
+    console.info('Baaah microphone track settings', track?.getSettings())
 
     const analyser = audioContext.createAnalyser()
     analyser.fftSize = FFT_SIZE
@@ -90,6 +111,7 @@ export class MicrophonePitchController {
   samplePitch(): PitchFrame {
     this.analyser.getFloatTimeDomainData(this.buffer)
     const [pitchHz, confidence] = this.detector.findPitch(this.buffer, this.audioContext.sampleRate)
+    const rms = calculateRms(this.buffer)
     const volume = calculateVolumeLevel(this.buffer)
 
     if (
@@ -98,17 +120,17 @@ export class MicrophonePitchController {
       pitchHz > MAX_PITCH_HZ ||
       confidence < MIN_CONFIDENCE
     ) {
-      return { pitchHz: null, confidence, volume }
+      return { pitchHz: null, confidence, volume, rms }
     }
 
-    return { pitchHz, confidence, volume }
+    return { pitchHz, confidence, volume, rms }
   }
 
   async calibrate({
     holdMs = CALIBRATION_HOLD_MS,
     timeoutMs = CALIBRATION_TIMEOUT_MS,
     onProgress,
-  }: CalibrationOptions = {}): Promise<number | null> {
+  }: CalibrationOptions = {}): Promise<CalibrationResult | null> {
     await this.resume()
 
     return new Promise((resolve) => {
@@ -116,25 +138,38 @@ export class MicrophonePitchController {
       let lastTickAt = startedAt
       let heldMs = 0
       let pitches: number[] = []
+      const noiseRmsSamples: number[] = []
+      let baaahRmsSamples: number[] = []
 
       const tick = () => {
         const now = performance.now()
         const dtMs = now - lastTickAt
         lastTickAt = now
         const frame = this.samplePitch()
+        const validBaaahPitch = frame.pitchHz
 
-        if (frame.pitchHz !== null && frame.volume >= MIN_CONTROL_VOLUME) {
+        if (validBaaahPitch) {
           heldMs += dtMs
-          pitches.push(frame.pitchHz)
+          pitches.push(validBaaahPitch)
+          baaahRmsSamples.push(frame.rms)
         } else {
           heldMs = 0
           pitches = []
+          baaahRmsSamples = []
+          noiseRmsSamples.push(frame.rms)
         }
 
         onProgress?.(Math.min(1, heldMs / holdMs))
 
         if (heldMs >= holdMs) {
-          resolve(median(pitches))
+          const noiseFloorRms = percentile(noiseRmsSamples, 0.5)
+          const baaahRms = median(baaahRmsSamples)
+          resolve({
+            measuredBaseHz: median(pitches),
+            voicedThresholdRms: calculateVoicedThresholdRms(noiseFloorRms, baaahRms),
+            noiseFloorRms,
+            baaahRms,
+          })
           return
         }
 
@@ -161,6 +196,14 @@ export class MicrophonePitchController {
   }
 }
 
+function makeAudioConstraints(supportedConstraints: MediaTrackSupportedConstraints): MediaTrackConstraints {
+  return {
+    ...(supportedConstraints.echoCancellation ? { echoCancellation: false } : {}),
+    ...(supportedConstraints.noiseSuppression ? { noiseSuppression: false } : {}),
+    ...(supportedConstraints.autoGainControl ? { autoGainControl: false } : {}),
+  }
+}
+
 async function resumeAudioContext(audioContext: AudioContext): Promise<void> {
   if (audioContext.state !== 'running') {
     await audioContext.resume()
@@ -181,6 +224,11 @@ function getAudioContextConstructor(): AudioContextConstructor {
 }
 
 function median(values: number[]): number {
+  return percentile(values, 0.5)
+}
+
+function percentile(values: number[], ratio: number): number {
+  if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
-  return sorted[Math.floor(sorted.length / 2)]
+  return sorted[Math.floor((sorted.length - 1) * ratio)]
 }

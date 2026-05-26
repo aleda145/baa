@@ -7,31 +7,39 @@ export const HIGH_THRESHOLD_SEMITONES = 3
 export const MIN_PITCH_HZ = 70
 export const MAX_PITCH_HZ = 700
 export const LANE_STABILITY_MS = 100
+export const SOUND_GRACE_MS = 180
 export const PITCH_SMOOTHING = 0.35
 export const VOLUME_SMOOTHING = 0.28
-export const MIN_CONTROL_VOLUME = 0.08
 
 export type PitchFrame = {
   pitchHz: number | null
   confidence: number
   volume: number
+  rms: number
 }
 
 export type PitchLaneFilterState = {
   measuredBaseHz: number
+  voicedThresholdRms: number
   lane: Lane
   candidateLane: Lane
   candidateStableMs: number
+  soundGraceMs: number
   smoothedPitchHz: number | null
   smoothedVolume: number
 }
 
-export function createPitchLaneFilter(measuredBaseHz: number): PitchLaneFilterState {
+export function createPitchLaneFilter(
+  measuredBaseHz: number,
+  voicedThresholdRms: number,
+): PitchLaneFilterState {
   return {
     measuredBaseHz,
+    voicedThresholdRms,
     lane: 0,
     candidateLane: 0,
     candidateStableMs: 0,
+    soundGraceMs: 0,
     smoothedPitchHz: null,
     smoothedVolume: 0,
   }
@@ -80,9 +88,11 @@ export function updatePitchLaneFilter(
   frame: PitchFrame,
   dtMs: number,
 ): InputState {
-  const loudEnough = frame.volume >= MIN_CONTROL_VOLUME
+  const soundDetected = frame.rms >= state.voicedThresholdRms
+  state.soundGraceMs = soundDetected ? SOUND_GRACE_MS : Math.max(0, state.soundGraceMs - dtMs)
+  const soundPresent = soundDetected || state.soundGraceMs > 0
   const validPitch = pitchInRange(frame.pitchHz)
-  const voiced = validPitch && frame.confidence >= MIN_CONFIDENCE && loudEnough
+  const voiced = validPitch && frame.confidence >= MIN_CONFIDENCE && soundPresent
   let smoothedPitchHz = state.smoothedPitchHz
   const smoothedVolume =
     state.smoothedVolume * (1 - VOLUME_SMOOTHING) + frame.volume * VOLUME_SMOOTHING

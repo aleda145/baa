@@ -27,6 +27,7 @@ export function App() {
   const previewGameRef = useRef<GameState>(createInitialGameState())
   const [screen, setScreen] = useState<Screen>('intro')
   const [measuredBaseHz, setMeasuredBaseHz] = useState<number | null>(null)
+  const [voicedThresholdRms, setVoicedThresholdRms] = useState<number | null>(null)
   const [calibrationProgress, setCalibrationProgress] = useState(0)
   const [message, setMessage] = useState('')
   const retryTimerRef = useRef<number | null>(null)
@@ -59,10 +60,10 @@ export function App() {
     setCalibrationProgress(0)
     setScreen('calibrating')
 
-    const baseHz = await mic.calibrate({
+    const calibration = await mic.calibrate({
       onProgress: setCalibrationProgress,
     })
-    if (baseHz === null) {
+    if (calibration === null) {
       setCalibrationProgress(0)
       setMessage('Could not hear baaah')
       retryTimerRef.current = window.setTimeout(() => {
@@ -73,7 +74,8 @@ export function App() {
 
     setMessage('')
     setCalibrationProgress(1)
-    setMeasuredBaseHz(baseHz)
+    setMeasuredBaseHz(calibration.measuredBaseHz)
+    setVoicedThresholdRms(calibration.voicedThresholdRms)
     setScreen('running')
   }
 
@@ -86,7 +88,11 @@ export function App() {
     setScreen('running')
   }
 
-  const isRunning = screen === 'running' && micRef.current !== null && measuredBaseHz !== null
+  const isRunning =
+    screen === 'running' &&
+    micRef.current !== null &&
+    measuredBaseHz !== null &&
+    voicedThresholdRms !== null
 
   return (
     <main className="app-shell">
@@ -94,6 +100,7 @@ export function App() {
         <RunningGame
           key={`${measuredBaseHz}-${screen}`}
           measuredBaseHz={measuredBaseHz!}
+          voicedThresholdRms={voicedThresholdRms!}
           mic={micRef.current!}
           onFinish={() => {
             setScreen('results')
@@ -188,15 +195,17 @@ function HoldMeter({ progress }: { progress: number }) {
 
 function RunningGame({
   measuredBaseHz,
+  voicedThresholdRms,
   mic,
   onFinish,
 }: {
   measuredBaseHz: number
+  voicedThresholdRms: number
   mic: MicrophonePitchController
   onFinish: () => void
 }) {
   const gameRef = useRef<GameState>(createInitialGameState())
-  const filterRef = useRef(createPitchLaneFilter(measuredBaseHz))
+  const filterRef = useRef(createPitchLaneFilter(measuredBaseHz, voicedThresholdRms))
   const lastTimeRef = useRef<number | null>(null)
   const finishedRef = useRef(false)
   const [game, setGame] = useState(gameRef.current)

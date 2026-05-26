@@ -9,6 +9,8 @@ import {
 } from './pitchLane'
 
 describe('pitch lane classification', () => {
+  const voicedThresholdRms = 0.01
+
   it('classifies pitch relative to a semitone-shifted center', () => {
     const measuredBaseHz = 100
     const centerHz = shiftHzBySemitones(measuredBaseHz, 2)
@@ -32,32 +34,57 @@ describe('pitch lane classification', () => {
   })
 
   it('requires a lane to stay stable before switching', () => {
-    const filter = createPitchLaneFilter(100)
+    const filter = createPitchLaneFilter(100, voicedThresholdRms)
 
-    const highTooSoon = updatePitchLaneFilter(filter, { pitchHz: 150, confidence: 0.95, volume: 0.4 }, 50)
+    const highTooSoon = updatePitchLaneFilter(
+      filter,
+      { pitchHz: 150, confidence: 0.95, volume: 0.4, rms: 0.05 },
+      50,
+    )
     expect(highTooSoon.lane).toBe(0)
 
-    const highStable = updatePitchLaneFilter(filter, { pitchHz: 150, confidence: 0.95, volume: 0.4 }, 50)
+    const highStable = updatePitchLaneFilter(
+      filter,
+      { pitchHz: 150, confidence: 0.95, volume: 0.4, rms: 0.05 },
+      50,
+    )
     expect(highStable.lane).toBe(1)
   })
 
   it('reports smoothed volume without changing pitch classification rules', () => {
-    const filter = createPitchLaneFilter(200)
-    const quiet = updatePitchLaneFilter(filter, { pitchHz: null, confidence: 0, volume: 0.5 }, 16)
+    const filter = createPitchLaneFilter(200, voicedThresholdRms)
+    const quiet = updatePitchLaneFilter(filter, { pitchHz: null, confidence: 0, volume: 0.5, rms: 0.05 }, 16)
 
     expect(quiet.lane).toBe(0)
     expect(quiet.volume).toBeGreaterThan(0)
   })
 
-  it('does not change lanes when loudness is too low', () => {
-    const filter = createPitchLaneFilter(100)
+  it('does not change lanes when RMS is below the adaptive threshold', () => {
+    const filter = createPitchLaneFilter(100, voicedThresholdRms)
     filter.lane = -1
     filter.candidateLane = -1
 
-    const quietHigh = updatePitchLaneFilter(filter, { pitchHz: 150, confidence: 0.96, volume: 0.02 }, 200)
+    const quietHigh = updatePitchLaneFilter(
+      filter,
+      { pitchHz: 150, confidence: 0.96, volume: 0.8, rms: 0.002 },
+      200,
+    )
 
     expect(quietHigh.lane).toBe(-1)
     expect(quietHigh.voiced).toBe(false)
     expect(quietHigh.label).toBe('?')
+  })
+
+  it('keeps sound active briefly after RMS drops', () => {
+    const filter = createPitchLaneFilter(100, voicedThresholdRms)
+
+    updatePitchLaneFilter(filter, { pitchHz: 150, confidence: 0.96, volume: 0.5, rms: 0.05 }, 100)
+    const graceFrame = updatePitchLaneFilter(
+      filter,
+      { pitchHz: 150, confidence: 0.96, volume: 0.2, rms: 0.001 },
+      100,
+    )
+
+    expect(graceFrame.voiced).toBe(true)
   })
 })
