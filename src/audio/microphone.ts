@@ -17,6 +17,8 @@ type CalibrationOptions = {
   onProgress?: (progress: number) => void
 }
 
+type AudioContextConstructor = typeof AudioContext
+
 export function calculateVolumeLevel(buffer: Float32Array): number {
   let sumSquares = 0
 
@@ -32,7 +34,9 @@ export class MicrophonePitchController {
   private constructor(
     private readonly stream: MediaStream,
     private readonly audioContext: AudioContext,
+    private readonly source: MediaStreamAudioSourceNode,
     private readonly analyser: AnalyserNode,
+    private readonly silentOutput: GainNode,
     private readonly detector: PitchDetector<Float32Array<ArrayBuffer>>,
     private readonly buffer: Float32Array<ArrayBuffer>,
   ) {}
@@ -42,34 +46,45 @@ export class MicrophonePitchController {
       throw new Error('Microphone input is not available in this browser.')
     }
 
+    const AudioContextClass = getAudioContextConstructor()
+    const audioContext = new AudioContextClass()
+    await resumeAudioContext(audioContext)
+
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-      },
+      audio: true,
     })
 
-    const audioContext = new AudioContext()
     const analyser = audioContext.createAnalyser()
     analyser.fftSize = FFT_SIZE
     analyser.smoothingTimeConstant = 0
 
     const source = audioContext.createMediaStreamSource(stream)
+    const silentOutput = audioContext.createGain()
+    silentOutput.gain.value = 0
+
     source.connect(analyser)
+    analyser.connect(silentOutput)
+    silentOutput.connect(audioContext.destination)
+    await resumeAudioContext(audioContext)
 
     const buffer: Float32Array<ArrayBuffer> = new Float32Array(
       new ArrayBuffer(analyser.fftSize * Float32Array.BYTES_PER_ELEMENT),
     )
     const detector = PitchDetector.forFloat32Array(buffer.length)
 
-    return new MicrophonePitchController(stream, audioContext, analyser, detector, buffer)
+    return new MicrophonePitchController(
+      stream,
+      audioContext,
+      source,
+      analyser,
+      silentOutput,
+      detector,
+      buffer,
+    )
   }
 
   async resume(): Promise<void> {
-    if (this.audioContext.state !== 'running') {
-      await this.audioContext.resume()
-    }
+    await resumeAudioContext(this.audioContext)
   }
 
   samplePitch(): PitchFrame {
@@ -136,11 +151,33 @@ export class MicrophonePitchController {
   }
 
   async close(): Promise<void> {
+    this.source.disconnect()
+    this.analyser.disconnect()
+    this.silentOutput.disconnect()
     this.stream.getTracks().forEach((track) => track.stop())
     if (this.audioContext.state !== 'closed') {
       await this.audioContext.close()
     }
   }
+}
+
+async function resumeAudioContext(audioContext: AudioContext): Promise<void> {
+  if (audioContext.state !== 'running') {
+    await audioContext.resume()
+  }
+}
+
+function getAudioContextConstructor(): AudioContextConstructor {
+  const audioWindow = window as typeof window & {
+    webkitAudioContext?: AudioContextConstructor
+  }
+
+  const AudioContextClass = audioWindow.AudioContext ?? audioWindow.webkitAudioContext
+  if (!AudioContextClass) {
+    throw new Error('Web Audio is not available in this browser.')
+  }
+
+  return AudioContextClass
 }
 
 function median(values: number[]): number {

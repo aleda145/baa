@@ -11,7 +11,7 @@ import {
 } from '../game/engine'
 import type { GameState, InputState } from '../types'
 
-type Screen = 'intro' | 'calibrate' | 'calibrating' | 'running' | 'results' | 'error'
+type Screen = 'intro' | 'calibrating' | 'running' | 'results' | 'error'
 
 const idleInput: InputState = {
   voiced: false,
@@ -29,9 +29,13 @@ export function App() {
   const [measuredBaseHz, setMeasuredBaseHz] = useState<number | null>(null)
   const [calibrationProgress, setCalibrationProgress] = useState(0)
   const [message, setMessage] = useState('')
+  const retryTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     return () => {
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current)
+      }
       void micRef.current?.close()
     }
   }, [])
@@ -39,31 +43,35 @@ export function App() {
   const requestMic = async () => {
     setMessage('')
     try {
-      micRef.current = await MicrophonePitchController.create()
-      setScreen('calibrate')
+      const mic = await MicrophonePitchController.create()
+      micRef.current = mic
+      await calibrate(mic)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not open the microphone.')
       setScreen('error')
     }
   }
 
-  const calibrate = async () => {
-    if (!micRef.current) return
+  const calibrate = async (mic = micRef.current) => {
+    if (!mic) return
 
     setMessage('')
     setCalibrationProgress(0)
     setScreen('calibrating')
 
-    const baseHz = await micRef.current.calibrate({
+    const baseHz = await mic.calibrate({
       onProgress: setCalibrationProgress,
     })
     if (baseHz === null) {
       setCalibrationProgress(0)
-      setMessage('Say baaah')
-      setScreen('calibrate')
+      setMessage('Could not hear baaah')
+      retryTimerRef.current = window.setTimeout(() => {
+        void calibrate(mic)
+      }, 700)
       return
     }
 
+    setMessage('')
     setCalibrationProgress(1)
     setMeasuredBaseHz(baseHz)
     setScreen('running')
@@ -71,7 +79,7 @@ export function App() {
 
   const retry = () => {
     if (measuredBaseHz === null) {
-      setScreen('calibrate')
+      void calibrate()
       return
     }
 
@@ -113,20 +121,8 @@ export function App() {
             </SetupPanel>
           )}
 
-          {screen === 'calibrate' && (
-            <SetupPanel
-              title="Say baaah"
-              eyebrow="🎙️"
-              buttonLabel="Start"
-              onPrimary={calibrate}
-              secondaryText={message}
-            >
-              <p>Say baaah</p>
-            </SetupPanel>
-          )}
-
           {screen === 'calibrating' && (
-            <SetupPanel title="Say baaah" eyebrow="👂" buttonLabel="..." disabled>
+            <SetupPanel title="Say baaah" eyebrow="👂" buttonLabel="..." disabled secondaryText={message}>
               <p>Say baaah</p>
               <HoldMeter progress={calibrationProgress} />
             </SetupPanel>
