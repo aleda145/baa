@@ -1,26 +1,44 @@
 import { describe, expect, it } from 'vitest'
-import { classifyPitch, createPitchLaneFilter, updatePitchLaneFilter } from './pitchLane'
+import {
+  classifyPitch,
+  createPitchLaneFilter,
+  pitchInRange,
+  pitchToLane,
+  shiftHzBySemitones,
+  updatePitchLaneFilter,
+} from './pitchLane'
 
 describe('pitch lane classification', () => {
-  it('classifies pitch relative to the calibrated baseline', () => {
-    expect(classifyPitch(200, 240, 0.9, 0)).toBe(1)
-    expect(classifyPitch(200, 200, 0.9, 1)).toBe(0)
-    expect(classifyPitch(200, 160, 0.9, 0)).toBe(-1)
+  it('classifies pitch relative to a semitone-shifted center', () => {
+    const measuredBaseHz = 100
+    const centerHz = shiftHzBySemitones(measuredBaseHz, 2)
+
+    expect(centerHz).toBeCloseTo(112.25, 2)
+    expect(pitchToLane(100, measuredBaseHz)).toBe(-1)
+    expect(pitchToLane(112, measuredBaseHz)).toBe(0)
+    expect(pitchToLane(134, measuredBaseHz)).toBe(1)
   })
 
   it('keeps the previous lane when pitch confidence is low', () => {
-    expect(classifyPitch(200, 260, 0.2, -1)).toBe(-1)
-    expect(classifyPitch(200, null, 0, 1)).toBe(1)
+    expect(classifyPitch(100, 160, 0.2, -1)).toBe(-1)
+    expect(classifyPitch(100, null, 0, 1)).toBe(1)
   })
 
-  it('smooths and rate limits lane changes', () => {
-    const filter = createPitchLaneFilter(200)
+  it('ignores pitches outside the usable range', () => {
+    expect(pitchInRange(70)).toBe(true)
+    expect(pitchInRange(700)).toBe(true)
+    expect(pitchInRange(69)).toBe(false)
+    expect(pitchInRange(701)).toBe(false)
+  })
 
-    const high = updatePitchLaneFilter(filter, { pitchHz: 255, confidence: 0.95, volume: 0.4 }, 200)
-    expect(high.lane).toBe(1)
+  it('requires a lane to stay stable before switching', () => {
+    const filter = createPitchLaneFilter(100)
 
-    const lowTooSoon = updatePitchLaneFilter(filter, { pitchHz: 130, confidence: 0.95, volume: 0.4 }, 16)
-    expect(lowTooSoon.lane).toBe(1)
+    const highTooSoon = updatePitchLaneFilter(filter, { pitchHz: 150, confidence: 0.95, volume: 0.4 }, 50)
+    expect(highTooSoon.lane).toBe(0)
+
+    const highStable = updatePitchLaneFilter(filter, { pitchHz: 150, confidence: 0.95, volume: 0.4 }, 50)
+    expect(highStable.lane).toBe(1)
   })
 
   it('reports smoothed volume without changing pitch classification rules', () => {
@@ -32,10 +50,11 @@ describe('pitch lane classification', () => {
   })
 
   it('does not change lanes when loudness is too low', () => {
-    const filter = createPitchLaneFilter(200)
+    const filter = createPitchLaneFilter(100)
     filter.lane = -1
+    filter.candidateLane = -1
 
-    const quietHigh = updatePitchLaneFilter(filter, { pitchHz: 270, confidence: 0.96, volume: 0.02 }, 200)
+    const quietHigh = updatePitchLaneFilter(filter, { pitchHz: 150, confidence: 0.96, volume: 0.02 }, 200)
 
     expect(quietHigh.lane).toBe(-1)
     expect(quietHigh.voiced).toBe(false)

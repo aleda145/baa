@@ -1,9 +1,13 @@
 import { PitchDetector } from 'pitchy'
-import { MIN_CONFIDENCE, type PitchFrame, medianPitch } from './pitchLane'
+import {
+  MAX_PITCH_HZ,
+  MIN_CONFIDENCE,
+  MIN_CONTROL_VOLUME,
+  MIN_PITCH_HZ,
+  type PitchFrame,
+} from './pitchLane'
 
 const FFT_SIZE = 2048
-const MIN_PITCH_HZ = 65
-const MAX_PITCH_HZ = 1000
 
 export function calculateVolumeLevel(buffer: Float32Array): number {
   let sumSquares = 0
@@ -77,21 +81,21 @@ export class MicrophonePitchController {
     return { pitchHz, confidence, volume }
   }
 
-  async calibrate(durationMs = 1400): Promise<number | null> {
+  async calibrate(timeoutMs = 3500): Promise<number | null> {
     await this.resume()
 
     return new Promise((resolve) => {
-      const pitches: number[] = []
       const startedAt = performance.now()
 
       const tick = () => {
         const frame = this.samplePitch()
-        if (frame.pitchHz !== null) {
-          pitches.push(frame.pitchHz)
+        if (frame.pitchHz !== null && frame.volume >= MIN_CONTROL_VOLUME) {
+          resolve(frame.pitchHz)
+          return
         }
 
-        if (performance.now() - startedAt >= durationMs) {
-          resolve(medianPitch(pitches))
+        if (performance.now() - startedAt >= timeoutMs) {
+          resolve(null)
           return
         }
 

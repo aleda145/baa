@@ -25,7 +25,7 @@ const idleInput: InputState = {
 export function App() {
   const micRef = useRef<MicrophonePitchController | null>(null)
   const [screen, setScreen] = useState<Screen>('intro')
-  const [baselineHz, setBaselineHz] = useState<number | null>(null)
+  const [measuredBaseHz, setMeasuredBaseHz] = useState<number | null>(null)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -51,19 +51,19 @@ export function App() {
     setMessage('')
     setScreen('calibrating')
 
-    const baseline = await micRef.current.calibrate()
-    if (baseline === null) {
-      setMessage('Could not hear a clear baaah. Try one steady normal baaah.')
+    const baseHz = await micRef.current.calibrate()
+    if (baseHz === null) {
+      setMessage('Could not hear baaah. Say baaah.')
       setScreen('calibrate')
       return
     }
 
-    setBaselineHz(baseline)
+    setMeasuredBaseHz(baseHz)
     setScreen('running')
   }
 
   const retry = () => {
-    if (baselineHz === null) {
+    if (measuredBaseHz === null) {
       setScreen('calibrate')
       return
     }
@@ -80,35 +80,32 @@ export function App() {
           buttonLabel="Use microphone"
           onPrimary={requestMic}
         >
-          <p>Baa high to go up.</p>
-          <p>Baa low to go down.</p>
-          <p>Reach the barn.</p>
+          <p>Say baaah</p>
         </SetupPanel>
       )}
 
       {screen === 'calibrate' && (
         <SetupPanel
-          title="Normal baaah"
+          title="Say baaah"
           eyebrow="🎙️"
-          buttonLabel="Record normal baaah"
+          buttonLabel="Start"
           onPrimary={calibrate}
           secondaryText={message}
         >
-          <p>Say one steady, comfortable baaah.</p>
-          <p>This becomes the middle lane.</p>
+          <p>Say baaah</p>
         </SetupPanel>
       )}
 
       {screen === 'calibrating' && (
-        <SetupPanel title="Listening..." eyebrow="👂" buttonLabel="Hold steady" disabled>
-          <p>Keep saying a normal baaah.</p>
+        <SetupPanel title="Say baaah" eyebrow="👂" buttonLabel="..." disabled>
+          <p>Say baaah</p>
         </SetupPanel>
       )}
 
-      {screen === 'running' && micRef.current && baselineHz !== null && (
+      {screen === 'running' && micRef.current && measuredBaseHz !== null && (
         <RunningGame
-          key={`${baselineHz}-${screen}`}
-          baselineHz={baselineHz}
+          key={`${measuredBaseHz}-${screen}`}
+          measuredBaseHz={measuredBaseHz}
           mic={micRef.current}
           onFinish={() => {
             setScreen('results')
@@ -165,16 +162,16 @@ function SetupPanel({
 }
 
 function RunningGame({
-  baselineHz,
+  measuredBaseHz,
   mic,
   onFinish,
 }: {
-  baselineHz: number
+  measuredBaseHz: number
   mic: MicrophonePitchController
   onFinish: () => void
 }) {
   const gameRef = useRef<GameState>(createInitialGameState())
-  const filterRef = useRef(createPitchLaneFilter(baselineHz))
+  const filterRef = useRef(createPitchLaneFilter(measuredBaseHz))
   const lastTimeRef = useRef<number | null>(null)
   const finishedRef = useRef(false)
   const [game, setGame] = useState(gameRef.current)
@@ -209,17 +206,17 @@ function RunningGame({
     return () => cancelAnimationFrame(animationFrame)
   }, [mic, onFinish])
 
-  return <GameScene game={game} input={input} baselineHz={baselineHz} />
+  return <GameScene game={game} input={input} measuredBaseHz={measuredBaseHz} />
 }
 
 function GameScene({
   game,
   input,
-  baselineHz,
+  measuredBaseHz,
 }: {
   game: GameState
   input: InputState
-  baselineHz: number
+  measuredBaseHz: number
 }) {
   const sheepTop = laneToPercent(game.sheep.lanePosition)
   const courseItems = getCourseItems(game)
@@ -241,7 +238,11 @@ function GameScene({
     <section className="game-screen">
       <div className="hud">
         <div>
-          <span>Pitch</span>
+          <span>Baseline</span>
+          <strong>{Math.round(measuredBaseHz)} Hz</strong>
+        </div>
+        <div>
+          <span>Current</span>
           <strong>{input.pitchHz ? `${Math.round(input.pitchHz)} Hz` : '...'}</strong>
         </div>
         <div className="volume-card">
@@ -255,9 +256,9 @@ function GameScene({
 
       <div className="course" aria-label="Baaah runner course">
         <div className="skyline">☁️ ☁️ ☁️</div>
-        <LaneGuide top={23} label="high" />
-        <LaneGuide top={50} label="normal" />
-        <LaneGuide top={77} label="low" />
+        <LaneGuide top={23} />
+        <LaneGuide top={50} />
+        <LaneGuide top={77} />
 
         <div className="start-flag" style={{ left: `${distanceToScreenX(0)}%` }} aria-label="start">
           🚩
@@ -293,18 +294,10 @@ function GameScene({
       <div className="progress-shell" aria-label="course progress">
         <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
       </div>
-
-      <div className="status-strip">
-        <span>baseline {Math.round(baselineHz)} Hz</span>
-      </div>
     </section>
   )
 }
 
-function LaneGuide({ top, label }: { top: number; label: string }) {
-  return (
-    <div className="lane-guide" style={{ top: `${top}%` }}>
-      <span>{label}</span>
-    </div>
-  )
+function LaneGuide({ top }: { top: number }) {
+  return <div className="lane-guide" style={{ top: `${top}%` }} />
 }
