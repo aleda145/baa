@@ -22,6 +22,7 @@ button {
 }
 
 .app-shell {
+  position: relative;
   min-height: 100vh;
   background:
     linear-gradient(180deg, rgba(127, 207, 234, 0.78) 0%, rgba(232, 248, 211, 0.9) 48%),
@@ -30,6 +31,20 @@ button {
   display: grid;
   place-items: center;
   padding: 24px;
+}
+
+.screen-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.screen-overlay .setup-screen {
+  pointer-events: auto;
 }
 
 .setup-screen {
@@ -115,6 +130,10 @@ button {
   width: min(1100px, 100%);
   display: grid;
   gap: 14px;
+}
+
+.game-screen-preview {
+  filter: saturate(0.9);
 }
 
 .hud,

@@ -24,6 +24,7 @@ const idleInput: InputState = {
 
 export function App() {
   const micRef = useRef<MicrophonePitchController | null>(null)
+  const previewGameRef = useRef<GameState>(createInitialGameState())
   const [screen, setScreen] = useState<Screen>('intro')
   const [measuredBaseHz, setMeasuredBaseHz] = useState<number | null>(null)
   const [calibrationProgress, setCalibrationProgress] = useState(0)
@@ -77,60 +78,73 @@ export function App() {
     setScreen('running')
   }
 
+  const isRunning = screen === 'running' && micRef.current !== null && measuredBaseHz !== null
+
   return (
     <main className="app-shell">
-      {screen === 'intro' && (
-        <SetupPanel
-          title="Baaah"
-          eyebrow="🐑"
-          buttonLabel="Use microphone"
-          onPrimary={requestMic}
-        >
-          <p>Say baaah</p>
-        </SetupPanel>
-      )}
-
-      {screen === 'calibrate' && (
-        <SetupPanel
-          title="Say baaah"
-          eyebrow="🎙️"
-          buttonLabel="Start"
-          onPrimary={calibrate}
-          secondaryText={message}
-        >
-          <p>Say baaah</p>
-        </SetupPanel>
-      )}
-
-      {screen === 'calibrating' && (
-        <SetupPanel title="Say baaah" eyebrow="👂" buttonLabel="..." disabled>
-          <p>Say baaah</p>
-          <HoldMeter progress={calibrationProgress} />
-        </SetupPanel>
-      )}
-
-      {screen === 'running' && micRef.current && measuredBaseHz !== null && (
+      {isRunning ? (
         <RunningGame
           key={`${measuredBaseHz}-${screen}`}
-          measuredBaseHz={measuredBaseHz}
-          mic={micRef.current}
+          measuredBaseHz={measuredBaseHz!}
+          mic={micRef.current!}
           onFinish={() => {
             setScreen('results')
           }}
         />
+      ) : (
+        <GameScene
+          game={previewGameRef.current}
+          input={idleInput}
+          measuredBaseHz={measuredBaseHz}
+          preview
+        />
       )}
 
-      {screen === 'results' && (
-        <SetupPanel title="Barn reached" eyebrow="🏠" buttonLabel="Retry" onPrimary={retry}>
-          <p>The sheep made it home.</p>
-        </SetupPanel>
-      )}
+      {!isRunning && (
+        <div className="screen-overlay">
+          {screen === 'intro' && (
+            <SetupPanel
+              title="Baaah"
+              eyebrow="🐑"
+              buttonLabel="Use microphone"
+              onPrimary={requestMic}
+            >
+              <p>Say baaah</p>
+            </SetupPanel>
+          )}
 
-      {screen === 'error' && (
-        <SetupPanel title="Mic blocked" eyebrow="🎙️" buttonLabel="Try again" onPrimary={requestMic}>
-          <p>{message || 'The microphone is unavailable.'}</p>
-          <p>Use localhost or HTTPS and allow microphone access.</p>
-        </SetupPanel>
+          {screen === 'calibrate' && (
+            <SetupPanel
+              title="Say baaah"
+              eyebrow="🎙️"
+              buttonLabel="Start"
+              onPrimary={calibrate}
+              secondaryText={message}
+            >
+              <p>Say baaah</p>
+            </SetupPanel>
+          )}
+
+          {screen === 'calibrating' && (
+            <SetupPanel title="Say baaah" eyebrow="👂" buttonLabel="..." disabled>
+              <p>Say baaah</p>
+              <HoldMeter progress={calibrationProgress} />
+            </SetupPanel>
+          )}
+
+          {screen === 'results' && (
+            <SetupPanel title="Barn reached" eyebrow="🏠" buttonLabel="Retry" onPrimary={retry}>
+              <p>The sheep made it home.</p>
+            </SetupPanel>
+          )}
+
+          {screen === 'error' && (
+            <SetupPanel title="Mic blocked" eyebrow="🎙️" buttonLabel="Try again" onPrimary={requestMic}>
+              <p>{message || 'The microphone is unavailable.'}</p>
+              <p>Use localhost or HTTPS and allow microphone access.</p>
+            </SetupPanel>
+          )}
+        </div>
       )}
     </main>
   )
@@ -228,10 +242,12 @@ function GameScene({
   game,
   input,
   measuredBaseHz,
+  preview = false,
 }: {
   game: GameState
   input: InputState
-  measuredBaseHz: number
+  measuredBaseHz: number | null
+  preview?: boolean
 }) {
   const sheepTop = laneToPercent(game.sheep.lanePosition)
   const courseItems = getCourseItems(game)
@@ -250,11 +266,11 @@ function GameScene({
     .join(' ')
 
   return (
-    <section className="game-screen">
+    <section className={preview ? 'game-screen game-screen-preview' : 'game-screen'}>
       <div className="hud">
         <div>
           <span>Baseline</span>
-          <strong>{Math.round(measuredBaseHz)} Hz</strong>
+          <strong>{measuredBaseHz ? `${Math.round(measuredBaseHz)} Hz` : '...'}</strong>
         </div>
         <div>
           <span>Current</span>
