@@ -39,7 +39,8 @@ export function calculateRms(buffer: Float32Array): number {
 
 export function calculateVolumeLevel(buffer: Float32Array): number {
   const rms = calculateRms(buffer)
-  return Math.min(1, Math.max(0, (rms - 0.005) * 7))
+  const linearLevel = Math.min(1, Math.max(0, (rms - 0.005) * 7))
+  return Math.sqrt(linearLevel)
 }
 
 export function calculateVoicedThresholdRms(noiseFloorRms: number, baaahRms: number): number {

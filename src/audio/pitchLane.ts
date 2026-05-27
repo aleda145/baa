@@ -141,11 +141,12 @@ export function updatePitchLaneFilter(
   dtMs: number,
 ): InputState {
   const previousLane = state.lane
-  const soundDetected = frame.rms >= state.voicedThresholdRms
+  const validPitch = pitchInRange(frame.pitchHz)
+  const confidentPitch = validPitch && frame.confidence >= MIN_CONFIDENCE
+  const soundDetected = frame.rms >= state.voicedThresholdRms || confidentPitch
   state.soundGraceMs = soundDetected ? SOUND_GRACE_MS : Math.max(0, state.soundGraceMs - dtMs)
   const soundPresent = soundDetected || state.soundGraceMs > 0
-  const validPitch = pitchInRange(frame.pitchHz)
-  const voiced = validPitch && frame.confidence >= MIN_CONFIDENCE && soundPresent
+  const voiced = confidentPitch && soundPresent
   let smoothedPitchHz = state.smoothedPitchHz
   let pitchOffsetSemitones: number | null = null
   const smoothedVolume =

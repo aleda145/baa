@@ -14,6 +14,12 @@ describe('microphone volume', () => {
     expect(loud).toBeLessThanOrEqual(1)
   })
 
+  it('lifts low RMS levels for mobile-friendly display', () => {
+    const mobileLevel = calculateVolumeLevel(new Float32Array([0.012, -0.012, 0.012, -0.012]))
+
+    expect(mobileLevel).toBeGreaterThan(0.2)
+  })
+
   it('calculates and clamps adaptive voiced thresholds', () => {
     expect(calculateVoicedThresholdRms(0.002, 0.022)).toBeCloseTo(0.009)
     expect(calculateVoicedThresholdRms(0, 0.001)).toBe(0.003)

@@ -153,20 +153,33 @@ describe('pitch lane classification', () => {
     expect(quiet.volume).toBeGreaterThan(0)
   })
 
-  it('does not change lanes when RMS is below the adaptive threshold', () => {
+  it('still reacts to confident pitch when RMS is below the adaptive threshold', () => {
     const filter = createPitchLaneFilter(100, voicedThresholdRms)
     filter.lane = -1
     filter.intentLane = -1
 
-    const quietHigh = updatePitchLaneFilter(
+    const lowRmsHigh = updatePitchLaneFilter(
       filter,
       { pitchHz: 150, confidence: 0.96, volume: 0.8, rms: 0.002 },
       200,
     )
 
-    expect(quietHigh.lane).toBe(-1)
-    expect(quietHigh.voiced).toBe(false)
-    expect(quietHigh.label).toBe('?')
+    expect(lowRmsHigh.intentLane).toBe(0)
+    expect(lowRmsHigh.voiced).toBe(true)
+    expect(lowRmsHigh.label).toBe('↑')
+  })
+
+  it('does not react when both RMS and pitch confidence are low', () => {
+    const filter = createPitchLaneFilter(100, voicedThresholdRms)
+
+    const unclear = updatePitchLaneFilter(
+      filter,
+      { pitchHz: 150, confidence: 0.2, volume: 0.8, rms: 0.002 },
+      200,
+    )
+
+    expect(unclear.voiced).toBe(false)
+    expect(unclear.label).toBe('?')
   })
 
   it('keeps sound active briefly after RMS drops', () => {
