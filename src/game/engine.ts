@@ -1,4 +1,4 @@
-import type { GameEvent, GameEventKind, GameItem, GameItemKind, GameState, Lane } from '../types'
+import type { GameEvent, GameEventKind, GameItem, GameState, Lane } from '../types'
 
 export const COURSE_LENGTH = 3000
 export const COURSE_START_X = 7
@@ -8,17 +8,9 @@ export const HIT_WINDOW = 24
 
 const laneOrder: Lane[] = [1, 0, -1]
 
-const itemEmoji: Record<GameItemKind, string> = {
-  wolf: '🐺',
-}
-
 const eventMessages: Record<GameEventKind, string> = {
   'wolf-hit': 'back!',
   finish: 'barn!',
-}
-
-export function getItemEmoji(kind: GameItemKind): string {
-  return itemEmoji[kind]
 }
 
 export function laneToPercent(lane: Lane | number): number {
@@ -74,13 +66,12 @@ export function createInitialGameState(): GameState {
   }
 }
 
-export function getCourseItems(state: GameState): Array<GameItem & { screenXPercent: number; emoji: string }> {
+export function getCourseItems(state: GameState): Array<GameItem & { screenXPercent: number }> {
   return state.items
     .filter((item) => !item.collectedOrHit && !item.missed)
     .map((item) => ({
       ...item,
       screenXPercent: distanceToScreenX(item.distance),
-      emoji: getItemEmoji(item.kind),
     }))
 }
 

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import notoSheepUrl from '../assets/noto-sheep.svg'
+import notoWolfUrl from '../assets/noto-wolf.svg'
 import { MicrophonePitchController } from '../audio/microphone'
 import { createPitchLaneFilter, updatePitchLaneFilter } from '../audio/pitchLane'
 import {
@@ -123,7 +125,7 @@ export function App() {
           {screen === 'intro' && (
             <SetupPanel
               title="Baaah"
-              eyebrow="🐑"
+              eyebrow={<img className="setup-emoji-asset" src={notoSheepUrl} alt="" draggable={false} />}
               buttonLabel="Use microphone"
               onPrimary={requestMic}
             >
@@ -166,7 +168,7 @@ function SetupPanel({
   children,
 }: {
   title: string
-  eyebrow: string
+  eyebrow: ReactNode
   buttonLabel: string
   onPrimary?: () => void
   disabled?: boolean
@@ -344,7 +346,7 @@ function GameScene({
             style={{ left: `${item.screenXPercent}%`, top: `${laneToPercent(item.lane)}%` }}
             aria-label={item.kind}
           >
-            {item.emoji}
+            <img className="emoji-asset" src={notoWolfUrl} alt="" draggable={false} />
           </div>
         ))}
 
@@ -355,7 +357,7 @@ function GameScene({
         <div className="sheep-x" style={sheepXStyle}>
           <div className={sheepClass} style={sheepYStyle}>
             <span className="baa-bubble">{input.label}</span>
-            <span className="sheep-emoji">🐑</span>
+            <img className="sheep-emoji emoji-asset" src={notoSheepUrl} alt="" draggable={false} />
           </div>
         </div>
 
