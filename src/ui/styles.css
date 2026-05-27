@@ -241,21 +241,29 @@ button {
   font-weight: 800;
 }
 
+.sheep-x,
 .sheep,
 .item,
 .barn {
   position: absolute;
   transform: translate(-50%, -50%);
-  will-change: transform, top, left;
+  will-change: transform;
   user-select: none;
 }
 
+.sheep-x {
+  left: 0;
+  top: 0;
+  z-index: 5;
+  transform: none;
+}
+
 .sheep {
+  left: 0;
+  top: 0;
   z-index: 5;
   font-size: clamp(32px, 5.5vw, 64px);
-  transition:
-    left 70ms linear,
-    top 130ms linear;
+  transition: transform 80ms linear;
   filter: drop-shadow(0 8px 0 rgba(33, 68, 28, 0.15));
 }
 

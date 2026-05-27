@@ -257,6 +257,8 @@ function GameScene({
   measuredBaseHz: number | null
   preview?: boolean
 }) {
+  const courseRef = useRef<HTMLDivElement | null>(null)
+  const [courseSize, setCourseSize] = useState({ width: 0, height: 0 })
   const sheepTop = laneToPercent(game.sheep.lanePosition)
   const courseItems = getCourseItems(game)
   const sheepX = distanceToScreenX(game.progress)
@@ -272,6 +274,35 @@ function GameScene({
   ]
     .filter(Boolean)
     .join(' ')
+  const sheepXStyle =
+    courseSize.width > 0 && courseSize.height > 0
+      ? {
+          transform: `translate3d(${(sheepX / 100) * courseSize.width}px, 0, 0)`,
+        }
+      : undefined
+  const sheepYStyle =
+    courseSize.width > 0 && courseSize.height > 0
+      ? {
+          transform: `translate3d(0, ${(sheepTop / 100) * courseSize.height}px, 0) translate(-50%, -50%)`,
+        }
+      : undefined
+
+  useEffect(() => {
+    const course = courseRef.current
+    if (!course) return
+
+    const updateSize = () => {
+      const rect = course.getBoundingClientRect()
+      setCourseSize({ width: rect.width, height: rect.height })
+    }
+
+    updateSize()
+
+    const observer = new ResizeObserver(updateSize)
+    observer.observe(course)
+
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <section className={preview ? 'game-screen game-screen-preview' : 'game-screen'}>
@@ -300,7 +331,7 @@ function GameScene({
         </div>
       </div>
 
-      <div className="course" aria-label="Baaah runner course">
+      <div ref={courseRef} className="course" aria-label="Baaah runner course">
         <div className="skyline">☁️ ☁️ ☁️</div>
         <LaneGuide top={23} />
         <LaneGuide top={50} />
@@ -321,9 +352,11 @@ function GameScene({
           🏠
         </div>
 
-        <div className={sheepClass} style={{ left: `${sheepX}%`, top: `${sheepTop}%` }}>
-          <span className="baa-bubble">{input.label}</span>
-          <span className="sheep-emoji">🐑</span>
+        <div className="sheep-x" style={sheepXStyle}>
+          <div className={sheepClass} style={sheepYStyle}>
+            <span className="baa-bubble">{input.label}</span>
+            <span className="sheep-emoji">🐑</span>
+          </div>
         </div>
 
         <div className="events">
