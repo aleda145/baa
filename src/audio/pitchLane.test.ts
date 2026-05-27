@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   classifyPitch,
   createPitchLaneFilter,
+  getPitchIntent,
   pitchInRange,
   pitchToLane,
   shiftHzBySemitones,
@@ -33,22 +34,115 @@ describe('pitch lane classification', () => {
     expect(pitchInRange(701)).toBe(false)
   })
 
-  it('requires a lane to stay stable before switching', () => {
+  it('charges the lane meter faster for stronger pitch differences', () => {
     const filter = createPitchLaneFilter(100, voicedThresholdRms)
 
-    const highTooSoon = updatePitchLaneFilter(
+    const moderateHigh = updatePitchLaneFilter(
       filter,
       { pitchHz: 150, confidence: 0.95, volume: 0.4, rms: 0.05 },
-      50,
+      100,
     )
-    expect(highTooSoon.lane).toBe(0)
+
+    const strongerFilter = createPitchLaneFilter(100, voicedThresholdRms)
+    const strongerHigh = updatePitchLaneFilter(
+      strongerFilter,
+      { pitchHz: 220, confidence: 0.95, volume: 0.4, rms: 0.05 },
+      100,
+    )
+
+    expect(strongerHigh.intentProgress).toBeGreaterThan(moderateHigh.intentProgress)
+    expect(strongerHigh.label).toBe('↑')
+  })
+
+  it('switches lanes when the pitch intent meter fills', () => {
+    const filter = createPitchLaneFilter(100, voicedThresholdRms)
 
     const highStable = updatePitchLaneFilter(
       filter,
-      { pitchHz: 150, confidence: 0.95, volume: 0.4, rms: 0.05 },
-      50,
+      { pitchHz: 220, confidence: 0.95, volume: 0.4, rms: 0.05 },
+      150,
     )
     expect(highStable.lane).toBe(1)
+  })
+
+  it('keeps moderate pitch from switching instantly', () => {
+    const filter = createPitchLaneFilter(100, voicedThresholdRms)
+
+    const highNotInstant = updatePitchLaneFilter(
+      filter,
+      { pitchHz: 150, confidence: 0.95, volume: 0.4, rms: 0.05 },
+      100,
+    )
+
+    expect(highNotInstant.lane).toBe(0)
+    expect(highNotInstant.intentProgress).toBeGreaterThan(0)
+  })
+
+  it('moves from bottom toward high pitch through the middle lane first', () => {
+    const filter = createPitchLaneFilter(100, voicedThresholdRms)
+    filter.lane = -1
+    filter.intentLane = -1
+
+    const highFromBottom = updatePitchLaneFilter(
+      filter,
+      { pitchHz: 220, confidence: 0.95, volume: 0.4, rms: 0.05 },
+      150,
+    )
+
+    expect(highFromBottom.intentLane).toBe(0)
+    expect(highFromBottom.lane).toBe(0)
+  })
+
+  it('moves from top toward low pitch through the middle lane first', () => {
+    const filter = createPitchLaneFilter(100, voicedThresholdRms)
+    filter.lane = 1
+    filter.intentLane = 1
+
+    const lowFromTop = updatePitchLaneFilter(
+      filter,
+      { pitchHz: 70, confidence: 0.95, volume: 0.4, rms: 0.05 },
+      150,
+    )
+
+    expect(lowFromTop.intentLane).toBe(0)
+    expect(lowFromTop.lane).toBe(0)
+  })
+
+  it('shows down when middle pitch moves from top toward middle', () => {
+    const filter = createPitchLaneFilter(100, voicedThresholdRms)
+    filter.lane = 1
+    filter.intentLane = 1
+
+    const middleFromTop = updatePitchLaneFilter(
+      filter,
+      { pitchHz: 112, confidence: 0.95, volume: 0.4, rms: 0.05 },
+      150,
+    )
+
+    expect(middleFromTop.intentLane).toBe(0)
+    expect(middleFromTop.label).toBe('↓')
+  })
+
+  it('shows dash only when staying in the middle lane', () => {
+    const filter = createPitchLaneFilter(100, voicedThresholdRms)
+
+    const middle = updatePitchLaneFilter(
+      filter,
+      { pitchHz: 112, confidence: 0.95, volume: 0.4, rms: 0.05 },
+      150,
+    )
+
+    expect(middle.intentLane).toBe(0)
+    expect(middle.label).toBe('-')
+  })
+
+  it('charges middle fastest when pitch is near the shifted center', () => {
+    const centered = getPitchIntent(shiftHzBySemitones(100, 2), 100)
+    const nearEdge = getPitchIntent(shiftHzBySemitones(100, 4), 100)
+
+    expect(centered.lane).toBe(0)
+    expect(nearEdge.lane).toBe(0)
+    expect(centered.strength).toBeGreaterThan(nearEdge.strength)
   })
 
   it('reports smoothed volume without changing pitch classification rules', () => {
@@ -62,7 +156,7 @@ describe('pitch lane classification', () => {
   it('does not change lanes when RMS is below the adaptive threshold', () => {
     const filter = createPitchLaneFilter(100, voicedThresholdRms)
     filter.lane = -1
-    filter.candidateLane = -1
+    filter.intentLane = -1
 
     const quietHigh = updatePitchLaneFilter(
       filter,

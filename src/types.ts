@@ -6,7 +6,10 @@ export type InputState = {
   confidence: number
   volume: number
   lane: Lane
-  label: 'BAA↑' | 'baa' | 'BAA↓' | '?'
+  intentLane: Lane
+  intentProgress: number
+  pitchOffsetSemitones: number | null
+  label: '↑' | '-' | '↓' | '?'
 }
 
 export type SheepState = {

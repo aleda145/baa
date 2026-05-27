@@ -19,6 +19,9 @@ const idleInput: InputState = {
   confidence: 0,
   volume: 0,
   lane: 0,
+  intentLane: 0,
+  intentProgress: 0,
+  pitchOffsetSemitones: null,
   label: '?',
 }
 
@@ -286,6 +289,13 @@ function GameScene({
           <strong>{Math.round(input.volume * 100)}%</strong>
           <div className="volume-meter" aria-label="baaah loudness">
             <div className="volume-fill" style={{ width: `${Math.round(input.volume * 100)}%` }} />
+          </div>
+        </div>
+        <div className="intent-card">
+          <span>Move</span>
+          <strong>{input.voiced ? input.label : '?'}</strong>
+          <div className="intent-meter" aria-label="lane intent">
+            <div className="intent-fill" style={{ width: `${Math.round(input.intentProgress * 100)}%` }} />
           </div>
         </div>
       </div>
