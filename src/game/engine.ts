@@ -73,7 +73,7 @@ export function createInitialGameState(): GameState {
 
 export function getCourseItems(state: GameState): Array<GameItem & { screenXPercent: number }> {
   return state.items
-    .filter((item) => !item.collectedOrHit && !item.missed)
+    .filter((item) => !item.collectedOrHit)
     .map((item) => ({
       ...item,
       screenXPercent: distanceToScreenX(item.distance),

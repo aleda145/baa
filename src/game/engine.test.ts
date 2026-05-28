@@ -5,6 +5,7 @@ import {
   COURSE_START_X,
   createInitialGameState,
   distanceToScreenX,
+  getCourseItems,
   HIT_WINDOW,
   lanePositionToPercent,
   makeCourseItems,
@@ -71,6 +72,17 @@ describe('runner engine', () => {
 
     expect(next.items[0].collectedOrHit).toBe(false)
     expect(next.finished).toBe(false)
+  })
+
+  it('keeps passed wolves visible on the course', () => {
+    const state = stateAtWolf(1)
+    state.items[0].distance = state.progress - HIT_WINDOW - 1
+    state.items[0].missed = true
+
+    const visibleItems = getCourseItems(state)
+
+    expect(visibleItems).toHaveLength(1)
+    expect(visibleItems[0].id).toBe('wolf')
   })
 
   it('resets to the start when the sheep hits a wolf', () => {
