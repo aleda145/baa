@@ -161,6 +161,14 @@ button {
   transform: translateY(1px);
 }
 
+.voice-control:disabled {
+  cursor: default;
+}
+
+.voice-control:disabled:active {
+  transform: none;
+}
+
 .voice-control span,
 .voice-control em {
   color: #526449;

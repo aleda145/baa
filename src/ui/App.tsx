@@ -3,7 +3,7 @@ import { Volume2 } from 'lucide-react'
 import notoSheepUrl from '../assets/noto-sheep.svg'
 import notoWolfUrl from '../assets/noto-wolf.svg'
 import { MicrophonePitchController } from '../audio/microphone'
-import { createPitchLaneFilter, updatePitchLaneFilter } from '../audio/pitchLane'
+import { createPitchLaneFilter, updatePitchLaneFilter, type PitchFrame } from '../audio/pitchLane'
 import {
   COURSE_LENGTH,
   createInitialGameState,
@@ -34,12 +34,32 @@ const idleInput: InputState = {
 
 const CONTROL_TICK_MS = 100
 
+function inputFromPitchFrame(frame: PitchFrame): InputState {
+  const voiced = frame.pitchHz !== null
+
+  return {
+    voiced,
+    pitchHz: frame.pitchHz,
+    rawPitchHz: frame.rawPitchHz ?? frame.pitchHz,
+    confidence: frame.confidence,
+    rawConfidence: frame.rawConfidence ?? frame.confidence,
+    pitchStatus: frame.pitchStatus ?? (frame.pitchHz === null ? 'none' : 'ok'),
+    volume: frame.volume,
+    lane: 0,
+    intentLane: 0,
+    intentProgress: 0,
+    pitchOffsetSemitones: null,
+    label: voiced ? '-' : '?',
+  }
+}
+
 export function App() {
   const micRef = useRef<MicrophonePitchController | null>(null)
   const previewGameRef = useRef<GameState>(createInitialGameState())
   const [screen, setScreen] = useState<Screen>('intro')
   const [measuredBaseHz, setMeasuredBaseHz] = useState<number | null>(null)
   const [voicedThresholdRms, setVoicedThresholdRms] = useState<number | null>(null)
+  const [setupInput, setSetupInput] = useState<InputState>(idleInput)
   const [calibrationProgress, setCalibrationProgress] = useState(0)
   const [message, setMessage] = useState('')
   const retryTimerRef = useRef<number | null>(null)
@@ -55,6 +75,7 @@ export function App() {
 
   const requestMic = async () => {
     setMessage('')
+    setSetupInput(idleInput)
     try {
       const mic = await MicrophonePitchController.create()
       micRef.current = mic
@@ -74,6 +95,9 @@ export function App() {
 
     const calibration = await mic.calibrate({
       onProgress: setCalibrationProgress,
+      onFrame: (frame) => {
+        setSetupInput(inputFromPitchFrame(frame))
+      },
     })
     if (calibration === null) {
       setCalibrationProgress(0)
@@ -124,7 +148,7 @@ export function App() {
       ) : (
         <GameScene
           game={previewGameRef.current}
-          input={idleInput}
+          input={setupInput}
           measuredBaseHz={measuredBaseHz}
           preview
         />
@@ -338,13 +362,16 @@ function GameScene({
     <section className={preview ? 'game-screen game-screen-preview' : 'game-screen'}>
       <div ref={courseRef} className="course" aria-label="Baaah runner course">
         <div className="course-top-status">
-          {onResetBaseline && (
-            <button className="voice-control" type="button" onClick={onResetBaseline}>
-              <span>Your baa</span>
-              <strong>{measuredBaseHz ? `${Math.round(measuredBaseHz)} Hz` : '...'}</strong>
-              <em>Reset</em>
-            </button>
-          )}
+          <button
+            className="voice-control"
+            type="button"
+            disabled={!onResetBaseline}
+            onClick={onResetBaseline}
+          >
+            <span>Your baa</span>
+            <strong>{measuredBaseHz ? `${Math.round(measuredBaseHz)} Hz` : '- Hz'}</strong>
+            <em>Reset</em>
+          </button>
         </div>
 
         <div className="course-audio-status">
@@ -354,7 +381,7 @@ function GameScene({
         <dl className="raw-debug" aria-label="raw pitch debug">
           <div>
             <dt>Raw</dt>
-            <dd>{input.rawPitchHz ? `${Math.round(input.rawPitchHz)} Hz` : '...'}</dd>
+            <dd>{input.rawPitchHz ? `${Math.round(input.rawPitchHz)} Hz` : '- Hz'}</dd>
           </div>
           <div>
             <dt>Conf</dt>
@@ -452,8 +479,11 @@ function getPitchWavePoints(input: InputState, measuredBaseHz: number | null): s
   const centerY = height / 2
   const sampleCount = 72
   const fallbackCycles = 2
+  const fallbackPitchRatio = input.pitchHz !== null ? input.pitchHz / 220 : 1
   const baselineRatio =
-    input.pitchHz !== null && measuredBaseHz !== null ? input.pitchHz / measuredBaseHz : 1
+    input.pitchHz !== null && measuredBaseHz !== null
+      ? input.pitchHz / measuredBaseHz
+      : fallbackPitchRatio
   const offsetCycles =
     input.pitchOffsetSemitones !== null ? 3 + input.pitchOffsetSemitones * 0.22 : fallbackCycles
   const cycles = clamp(

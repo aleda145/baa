@@ -16,6 +16,7 @@ type CalibrationOptions = {
   holdMs?: number
   timeoutMs?: number
   onProgress?: (progress: number) => void
+  onFrame?: (frame: PitchFrame) => void
 }
 
 export type CalibrationResult = {
@@ -145,6 +146,7 @@ export class MicrophonePitchController {
     holdMs = CALIBRATION_HOLD_MS,
     timeoutMs = CALIBRATION_TIMEOUT_MS,
     onProgress,
+    onFrame,
   }: CalibrationOptions = {}): Promise<CalibrationResult | null> {
     await this.resume()
 
@@ -161,6 +163,7 @@ export class MicrophonePitchController {
         const dtMs = now - lastTickAt
         lastTickAt = now
         const frame = this.samplePitch()
+        onFrame?.(frame)
         const validBaaahPitch = frame.pitchHz
 
         if (validBaaahPitch) {
