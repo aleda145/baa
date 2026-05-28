@@ -268,8 +268,6 @@ function GameScene({
   const progressPercent = Math.min(100, (game.progress / COURSE_LENGTH) * 100)
   const sheepClass = [
     'sheep',
-    input.lane === 1 ? 'sheep-high' : '',
-    input.lane === -1 ? 'sheep-low' : '',
     game.sheep.tumbleMs > 0 ? 'sheep-tumble' : '',
     game.sheep.blinkMs > 0 ? 'sheep-blink' : '',
     !input.voiced ? 'sheep-confused' : '',
@@ -355,8 +353,10 @@ function GameScene({
         </div>
 
         <div className="sheep-x" style={sheepXStyle}>
-          <div className={sheepClass} style={sheepYStyle}>
+          <div className="baa-bubble-wrap" style={sheepYStyle}>
             <span className="baa-bubble">{input.label}</span>
+          </div>
+          <div className={sheepClass} style={sheepYStyle}>
             <img className="sheep-emoji emoji-asset" src={notoSheepUrl} alt="" draggable={false} />
           </div>
         </div>

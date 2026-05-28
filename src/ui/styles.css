@@ -249,6 +249,7 @@ button {
 }
 
 .sheep-x,
+.baa-bubble-wrap,
 .sheep,
 .item,
 .barn {
@@ -274,21 +275,21 @@ button {
   filter: drop-shadow(0 8px 0 rgba(33, 68, 28, 0.15));
 }
 
+.baa-bubble-wrap {
+  left: 0;
+  top: 0;
+  z-index: 8;
+  width: clamp(38px, 6.4vw, 72px);
+  pointer-events: none;
+}
+
 .sheep-emoji {
   display: block;
   width: 100%;
   height: auto;
   transform-origin: 50% 70%;
-  scale: -1 1;
+  transform: scaleX(-1);
   animation: sheep-run 260ms ease-in-out infinite alternate;
-}
-
-.sheep-high .sheep-emoji {
-  transform: scaleY(1.16) scaleX(0.92);
-}
-
-.sheep-low .sheep-emoji {
-  transform: scaleY(0.84) scaleX(1.16);
 }
 
 .sheep-confused .sheep-emoji {
@@ -306,8 +307,8 @@ button {
 .baa-bubble {
   position: absolute;
   left: 50%;
-  bottom: 82%;
-  transform: translateX(-50%);
+  bottom: calc(100% + 24px);
+  transform: translateX(-50%) translateY(-6px);
   padding: 5px 10px;
   min-width: 46px;
   text-align: center;
