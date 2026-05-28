@@ -342,6 +342,7 @@ function GameScene({
             <div className="intent-fill" style={{ width: `${Math.round(input.intentProgress * 100)}%` }} />
           </div>
         </div>
+        <PitchWave input={input} measuredBaseHz={measuredBaseHz} />
       </div>
 
       <div ref={courseRef} className="course" aria-label="Baaah runner course">
@@ -386,6 +387,58 @@ function GameScene({
       </div>
     </section>
   )
+}
+
+function PitchWave({
+  input,
+  measuredBaseHz,
+}: {
+  input: InputState
+  measuredBaseHz: number | null
+}) {
+  const points = getPitchWavePoints(input, measuredBaseHz)
+  const waveClass = ['pitch-wave-line', input.voiced ? 'pitch-wave-line-active' : '']
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <div className="pitch-wave-card">
+      <span>Wave</span>
+      <svg className="pitch-wave" viewBox="0 0 144 46" role="img" aria-label="pitch wave">
+        <line className="pitch-wave-center" x1="0" y1="23" x2="144" y2="23" />
+        <polyline className={waveClass} points={points} />
+      </svg>
+    </div>
+  )
+}
+
+function getPitchWavePoints(input: InputState, measuredBaseHz: number | null): string {
+  const width = 144
+  const height = 46
+  const centerY = height / 2
+  const sampleCount = 72
+  const fallbackCycles = 2
+  const baselineRatio =
+    input.pitchHz !== null && measuredBaseHz !== null ? input.pitchHz / measuredBaseHz : 1
+  const offsetCycles =
+    input.pitchOffsetSemitones !== null ? 3 + input.pitchOffsetSemitones * 0.22 : fallbackCycles
+  const cycles = clamp(
+    input.voiced ? (input.pitchOffsetSemitones === null ? 3 * baselineRatio : offsetCycles) : fallbackCycles,
+    1.4,
+    6,
+  )
+  const amplitude = input.voiced ? clamp(5 + input.volume * 24, 6, 17) : 3
+
+  return Array.from({ length: sampleCount }, (_, index) => {
+    const t = index / (sampleCount - 1)
+    const x = t * width
+    const y = centerY + Math.sin(t * cycles * Math.PI * 2) * amplitude
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
 }
 
 function LaneGuide({ top }: { top: number }) {

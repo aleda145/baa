@@ -180,6 +180,10 @@ button {
   width: 150px;
 }
 
+.pitch-wave-card {
+  width: 180px;
+}
+
 .volume-meter,
 .intent-meter {
   height: 9px;
@@ -201,6 +205,33 @@ button {
   border-radius: inherit;
   background: #225c3a;
   transition: width 70ms linear;
+}
+
+.pitch-wave {
+  display: block;
+  width: 100%;
+  height: 46px;
+  margin-top: 4px;
+  overflow: visible;
+}
+
+.pitch-wave-center {
+  stroke: rgba(82, 100, 73, 0.2);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.pitch-wave-line {
+  fill: none;
+  stroke: rgba(82, 100, 73, 0.55);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 100ms linear;
+}
+
+.pitch-wave-line-active {
+  stroke: #225c3a;
 }
 
 .course {
