@@ -180,15 +180,8 @@ button {
   max-width: calc(100% - 28px);
 }
 
-.audio-readouts {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .status-pill,
-.pitch-wave-card {
+.audio-meter {
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(56, 99, 45, 0.14);
   border-radius: 8px;
@@ -201,12 +194,7 @@ button {
   min-width: 88px;
 }
 
-.status-pill-wide {
-  width: 118px;
-}
-
-.status-pill span,
-.pitch-wave-card span {
+.status-pill span {
   display: block;
   color: #526449;
   font-size: 10px;
@@ -256,30 +244,68 @@ button {
   color: #182015;
 }
 
-.pitch-wave-card {
-  width: 170px;
+.audio-meter {
+  width: 188px;
+  padding: 7px 9px 8px;
+}
+
+.audio-meter-frequency {
+  display: block;
+  color: #182015;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .volume-meter {
-  height: 9px;
-  margin-top: 7px;
+  position: relative;
+  height: 13px;
+  margin-top: 6px;
   border-radius: 999px;
   overflow: hidden;
   background: rgba(82, 100, 73, 0.16);
 }
 
+.volume-meter span {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  color: rgba(24, 32, 21, 0.82);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.volume-icon {
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  z-index: 3;
+  color: rgba(24, 32, 21, 0.72);
+  transform: translateY(-50%);
+}
+
 .volume-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, #4f9f46, #ffd24a, #dc4d36);
   transition: width 80ms linear;
 }
 
+.pitch-wave-wrap {
+  position: relative;
+  height: 40px;
+  margin-top: 2px;
+}
+
 .pitch-wave {
   display: block;
   width: 100%;
-  height: 46px;
-  margin-top: 4px;
+  height: 40px;
   overflow: visible;
 }
 
@@ -518,17 +544,13 @@ button {
     bottom: 10px;
   }
 
-  .pitch-wave-card {
-    width: 128px;
+  .audio-meter {
+    width: 148px;
   }
 
   .status-pill {
     min-width: 74px;
     padding: 6px 7px;
-  }
-
-  .status-pill-wide {
-    width: 96px;
   }
 
   .status-pill strong {

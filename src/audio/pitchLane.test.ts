@@ -148,7 +148,26 @@ describe('pitch lane classification', () => {
     const quiet = updatePitchLaneFilter(filter, { pitchHz: null, confidence: 0, volume: 0.5, rms: 0.05 }, 16)
 
     expect(quiet.lane).toBe(0)
+    expect(quiet.pitchHz).toBeNull()
     expect(quiet.volume).toBeGreaterThan(0)
+  })
+
+  it('does not expose stale current pitch when input stops being valid', () => {
+    const filter = createPitchLaneFilter(100, voicedThresholdRms)
+
+    const voiced = updatePitchLaneFilter(
+      filter,
+      { pitchHz: 100, confidence: 0.95, volume: 0.5, rms: 0.05 },
+      100,
+    )
+    const silent = updatePitchLaneFilter(
+      filter,
+      { pitchHz: null, confidence: 0, volume: 0, rms: 0 },
+      250,
+    )
+
+    expect(voiced.pitchHz).toBeGreaterThan(0)
+    expect(silent.pitchHz).toBeNull()
   })
 
   it('still reacts to confident pitch when RMS is below the adaptive threshold', () => {

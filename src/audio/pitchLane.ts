@@ -190,7 +190,7 @@ export function updatePitchLaneFilter(
 
   return {
     voiced,
-    pitchHz: smoothedPitchHz,
+    pitchHz: voiced ? smoothedPitchHz : null,
     rawPitchHz: frame.rawPitchHz ?? frame.pitchHz,
     confidence: frame.confidence,
     rawConfidence: frame.rawConfidence ?? frame.confidence,

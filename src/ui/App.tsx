@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Volume2 } from 'lucide-react'
 import notoSheepUrl from '../assets/noto-sheep.svg'
 import notoWolfUrl from '../assets/noto-wolf.svg'
 import { MicrophonePitchController } from '../audio/microphone'
@@ -346,17 +347,7 @@ function GameScene({
         </div>
 
         <div className="course-audio-status">
-          <PitchWave input={input} measuredBaseHz={measuredBaseHz} />
-          <div className="audio-readouts">
-            <StatusPill label="Current" value={input.pitchHz ? `${Math.round(input.pitchHz)} Hz` : '...'} />
-            <div className="status-pill status-pill-wide">
-              <span>Loudness</span>
-              <strong>{Math.round(input.volume * 100)}%</strong>
-              <div className="volume-meter" aria-label="baaah loudness">
-                <div className="volume-fill" style={{ width: `${Math.round(input.volume * 100)}%` }} />
-              </div>
-            </div>
-          </div>
+          <AudioMeter input={input} measuredBaseHz={measuredBaseHz} />
         </div>
 
         <dl className="raw-debug" aria-label="raw pitch debug">
@@ -422,7 +413,7 @@ function StatusPill({ label, value }: { label: string; value: string }) {
   )
 }
 
-function PitchWave({
+function AudioMeter({
   input,
   measuredBaseHz,
 }: {
@@ -433,14 +424,23 @@ function PitchWave({
   const waveClass = ['pitch-wave-line', input.voiced ? 'pitch-wave-line-active' : '']
     .filter(Boolean)
     .join(' ')
+  const currentHz = input.pitchHz ? `${Math.round(input.pitchHz)} Hz` : '- Hz'
+  const loudnessPercent = Math.round(input.volume * 100)
 
   return (
-    <div className="pitch-wave-card">
-      <span>Wave</span>
-      <svg className="pitch-wave" viewBox="0 0 144 46" role="img" aria-label="pitch wave">
-        <line className="pitch-wave-center" x1="0" y1="23" x2="144" y2="23" />
-        <polyline className={waveClass} points={points} />
-      </svg>
+    <div className="audio-meter">
+      <strong className="audio-meter-frequency">{currentHz}</strong>
+      <div className="pitch-wave-wrap">
+        <svg className="pitch-wave" viewBox="0 0 144 46" role="img" aria-label="pitch wave">
+          <line className="pitch-wave-center" x1="0" y1="23" x2="144" y2="23" />
+          <polyline className={waveClass} points={points} />
+        </svg>
+      </div>
+      <div className="volume-meter" aria-label="baaah loudness">
+        <div className="volume-fill" style={{ width: `${loudnessPercent}%` }} />
+        <Volume2 className="volume-icon" aria-hidden="true" size={12} strokeWidth={3} />
+        <span>{loudnessPercent}%</span>
+      </div>
     </div>
   )
 }
