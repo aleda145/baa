@@ -1,8 +1,7 @@
 import type { InputState, Lane } from '../types'
 
 export const MIN_CONFIDENCE = 0.72
-export const CENTER_SHIFT_SEMITONES = 2
-export const LOW_THRESHOLD_SEMITONES = -2
+export const LOW_THRESHOLD_SEMITONES = -1.5
 export const HIGH_THRESHOLD_SEMITONES = 3
 export const MIN_PITCH_HZ = 70
 export const MAX_PITCH_HZ = 700
@@ -85,8 +84,7 @@ export function pitchToLane(freqHz: number, measuredBaseHz: number): Lane {
 }
 
 export function semitonesFromCenter(freqHz: number, measuredBaseHz: number): number {
-  const centerHz = shiftHzBySemitones(measuredBaseHz, CENTER_SHIFT_SEMITONES)
-  return semitonesFrom(freqHz, centerHz)
+  return semitonesFrom(freqHz, measuredBaseHz)
 }
 
 export type PitchIntent = {

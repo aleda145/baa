@@ -5,21 +5,19 @@ import {
   getPitchIntent,
   pitchInRange,
   pitchToLane,
-  shiftHzBySemitones,
   updatePitchLaneFilter,
 } from './pitchLane'
 
 describe('pitch lane classification', () => {
   const voicedThresholdRms = 0.01
 
-  it('classifies pitch relative to a semitone-shifted center', () => {
+  it('classifies pitch relative to the measured baseline', () => {
     const measuredBaseHz = 100
-    const centerHz = shiftHzBySemitones(measuredBaseHz, 2)
 
-    expect(centerHz).toBeCloseTo(112.25, 2)
-    expect(pitchToLane(100, measuredBaseHz)).toBe(-1)
+    expect(pitchToLane(91, measuredBaseHz)).toBe(-1)
+    expect(pitchToLane(100, measuredBaseHz)).toBe(0)
     expect(pitchToLane(112, measuredBaseHz)).toBe(0)
-    expect(pitchToLane(134, measuredBaseHz)).toBe(1)
+    expect(pitchToLane(120, measuredBaseHz)).toBe(1)
   })
 
   it('keeps the previous lane when pitch confidence is low', () => {
@@ -39,7 +37,7 @@ describe('pitch lane classification', () => {
 
     const moderateHigh = updatePitchLaneFilter(
       filter,
-      { pitchHz: 150, confidence: 0.95, volume: 0.4, rms: 0.05 },
+      { pitchHz: 125, confidence: 0.95, volume: 0.4, rms: 0.05 },
       100,
     )
 
@@ -136,9 +134,9 @@ describe('pitch lane classification', () => {
     expect(middle.label).toBe('-')
   })
 
-  it('charges middle fastest when pitch is near the shifted center', () => {
-    const centered = getPitchIntent(shiftHzBySemitones(100, 2), 100)
-    const nearEdge = getPitchIntent(shiftHzBySemitones(100, 4), 100)
+  it('charges middle fastest when pitch is near the measured baseline', () => {
+    const centered = getPitchIntent(100, 100)
+    const nearEdge = getPitchIntent(112, 100)
 
     expect(centered.lane).toBe(0)
     expect(nearEdge.lane).toBe(0)
