@@ -134,6 +134,7 @@ button {
 }
 
 .game-screen {
+  position: relative;
   width: min(1100px, 100%);
   display: grid;
   gap: 14px;
@@ -149,6 +150,25 @@ button {
   justify-content: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.reset-baseline-button {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 12;
+  border: 2px solid rgba(56, 99, 45, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #225c3a;
+  padding: 8px 11px;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.reset-baseline-button:active {
+  transform: translateY(1px);
 }
 
 .hud > div,

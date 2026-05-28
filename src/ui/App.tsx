@@ -113,6 +113,9 @@ export function App() {
           measuredBaseHz={measuredBaseHz!}
           voicedThresholdRms={voicedThresholdRms!}
           mic={micRef.current!}
+          onResetBaseline={() => {
+            void calibrate(micRef.current)
+          }}
           onFinish={() => {
             setScreen('results')
           }}
@@ -208,11 +211,13 @@ function RunningGame({
   measuredBaseHz,
   voicedThresholdRms,
   mic,
+  onResetBaseline,
   onFinish,
 }: {
   measuredBaseHz: number
   voicedThresholdRms: number
   mic: MicrophonePitchController
+  onResetBaseline: () => void
   onFinish: () => void
 }) {
   const gameRef = useRef<GameState>(createInitialGameState())
@@ -261,18 +266,27 @@ function RunningGame({
     return () => cancelAnimationFrame(animationFrame)
   }, [mic, onFinish])
 
-  return <GameScene game={game} input={input} measuredBaseHz={measuredBaseHz} />
+  return (
+    <GameScene
+      game={game}
+      input={input}
+      measuredBaseHz={measuredBaseHz}
+      onResetBaseline={onResetBaseline}
+    />
+  )
 }
 
 function GameScene({
   game,
   input,
   measuredBaseHz,
+  onResetBaseline,
   preview = false,
 }: {
   game: GameState
   input: InputState
   measuredBaseHz: number | null
+  onResetBaseline?: () => void
   preview?: boolean
 }) {
   const courseRef = useRef<HTMLDivElement | null>(null)
@@ -355,6 +369,12 @@ function GameScene({
       </div>
 
       <div ref={courseRef} className="course" aria-label="Baaah runner course">
+        {onResetBaseline && (
+          <button className="reset-baseline-button" type="button" onClick={onResetBaseline}>
+            Reset Voice
+          </button>
+        )}
+
         <div className="skyline">☁️ ☁️ ☁️</div>
         <LaneGuide top={23} />
         <LaneGuide top={50} />
