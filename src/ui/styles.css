@@ -144,20 +144,45 @@ button {
   filter: saturate(0.9);
 }
 
-.reset-baseline-button {
-  border: 2px solid rgba(56, 99, 45, 0.18);
+.voice-control {
+  display: grid;
+  justify-items: start;
+  width: max-content;
+  border: 1px solid rgba(56, 99, 45, 0.14);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
-  color: #225c3a;
-  min-height: 36px;
-  padding: 0 11px;
-  font-size: 12px;
-  font-weight: 900;
+  background: rgba(255, 255, 255, 0.7);
+  color: #182015;
+  padding: 8px 10px;
+  box-shadow: 0 5px 14px rgba(42, 80, 34, 0.08);
   cursor: pointer;
 }
 
-.reset-baseline-button:active {
+.voice-control:active {
   transform: translateY(1px);
+}
+
+.voice-control span,
+.voice-control em {
+  color: #526449;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.voice-control strong {
+  margin-top: 4px;
+  font-size: 18px;
+  line-height: 1.05;
+}
+
+.voice-control em {
+  width: 100%;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(82, 100, 73, 0.24);
+  color: #225c3a;
 }
 
 .course-top-status,
@@ -180,7 +205,6 @@ button {
   max-width: calc(100% - 28px);
 }
 
-.status-pill,
 .audio-meter {
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(56, 99, 45, 0.14);
@@ -188,26 +212,6 @@ button {
   padding: 7px 9px;
   color: #182015;
   box-shadow: 0 5px 14px rgba(42, 80, 34, 0.08);
-}
-
-.status-pill {
-  min-width: 88px;
-}
-
-.status-pill span {
-  display: block;
-  color: #526449;
-  font-size: 10px;
-  font-weight: 900;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.status-pill strong {
-  display: block;
-  margin-top: 3px;
-  font-size: 16px;
-  line-height: 1.05;
 }
 
 .raw-debug {
@@ -548,12 +552,11 @@ button {
     width: 148px;
   }
 
-  .status-pill {
-    min-width: 74px;
+  .voice-control {
     padding: 6px 7px;
   }
 
-  .status-pill strong {
+  .voice-control strong {
     font-size: 14px;
   }
 

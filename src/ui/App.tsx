@@ -339,11 +339,12 @@ function GameScene({
       <div ref={courseRef} className="course" aria-label="Baaah runner course">
         <div className="course-top-status">
           {onResetBaseline && (
-            <button className="reset-baseline-button" type="button" onClick={onResetBaseline}>
-              Reset Voice
+            <button className="voice-control" type="button" onClick={onResetBaseline}>
+              <span>Your baa</span>
+              <strong>{measuredBaseHz ? `${Math.round(measuredBaseHz)} Hz` : '...'}</strong>
+              <em>Reset</em>
             </button>
           )}
-          <StatusPill label="Baseline" value={measuredBaseHz ? `${Math.round(measuredBaseHz)} Hz` : '...'} />
         </div>
 
         <div className="course-audio-status">
@@ -401,15 +402,6 @@ function GameScene({
         </div>
       </div>
     </section>
-  )
-}
-
-function StatusPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="status-pill">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
   )
 }
 
