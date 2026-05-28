@@ -5,6 +5,7 @@ export const COURSE_START_X = 7
 export const COURSE_END_X = 93
 export const BASE_SPEED = 136
 export const HIT_WINDOW = 24
+export const LANE_EASE_MS = 210
 
 const laneOrder: Lane[] = [1, 0, -1]
 
@@ -17,6 +18,10 @@ export function laneToPercent(lane: Lane | number): number {
   if (lane >= 0.5) return 23
   if (lane <= -0.5) return 77
   return 50
+}
+
+export function lanePositionToPercent(lanePosition: number): number {
+  return Math.min(77, Math.max(23, 50 - lanePosition * 27))
 }
 
 export function nearestLane(value: number): Lane {
@@ -89,7 +94,7 @@ export function updateGameState(state: GameState, targetLane: Lane, dtMs: number
   next.sheep.tumbleMs = Math.max(0, next.sheep.tumbleMs - dtMs)
   next.sheep.blinkMs = Math.max(0, next.sheep.blinkMs - dtMs)
 
-  const laneEase = Math.min(1, dtMs / 150)
+  const laneEase = 1 - Math.exp(-dtMs / LANE_EASE_MS)
   next.sheep.lanePosition += (targetLane - next.sheep.lanePosition) * laneEase
   next.sheep.lane = nearestLane(next.sheep.lanePosition)
 

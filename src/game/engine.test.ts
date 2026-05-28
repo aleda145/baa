@@ -6,6 +6,7 @@ import {
   createInitialGameState,
   distanceToScreenX,
   HIT_WINDOW,
+  lanePositionToPercent,
   makeCourseItems,
   updateGameState,
 } from './engine'
@@ -35,6 +36,13 @@ describe('runner engine', () => {
     expect(distanceToScreenX(0)).toBe(COURSE_START_X)
     expect(distanceToScreenX(COURSE_LENGTH)).toBe(COURSE_END_X)
     expect(distanceToScreenX(COURSE_LENGTH / 2)).toBe((COURSE_START_X + COURSE_END_X) / 2)
+  })
+
+  it('maps continuous lane positions into continuous screen Y coordinates', () => {
+    expect(lanePositionToPercent(1)).toBe(23)
+    expect(lanePositionToPercent(0)).toBe(50)
+    expect(lanePositionToPercent(-1)).toBe(77)
+    expect(lanePositionToPercent(0.5)).toBe(36.5)
   })
 
   it('generates wolves only', () => {

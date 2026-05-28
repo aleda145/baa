@@ -8,6 +8,7 @@ import {
   createInitialGameState,
   distanceToScreenX,
   getCourseItems,
+  lanePositionToPercent,
   laneToPercent,
   updateGameState,
 } from '../game/engine'
@@ -261,7 +262,7 @@ function GameScene({
 }) {
   const courseRef = useRef<HTMLDivElement | null>(null)
   const [courseSize, setCourseSize] = useState({ width: 0, height: 0 })
-  const sheepTop = laneToPercent(game.sheep.lanePosition)
+  const sheepTop = lanePositionToPercent(game.sheep.lanePosition)
   const courseItems = getCourseItems(game)
   const sheepX = distanceToScreenX(game.progress)
   const barnX = distanceToScreenX(COURSE_LENGTH)

@@ -271,7 +271,6 @@ button {
   top: 0;
   z-index: 5;
   width: clamp(38px, 6.4vw, 72px);
-  transition: transform 80ms linear;
   filter: drop-shadow(0 8px 0 rgba(33, 68, 28, 0.15));
 }
 
