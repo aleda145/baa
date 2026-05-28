@@ -28,6 +28,8 @@ const idleInput: InputState = {
   label: '?',
 }
 
+const CONTROL_TICK_MS = 100
+
 export function App() {
   const micRef = useRef<MicrophonePitchController | null>(null)
   const previewGameRef = useRef<GameState>(createInitialGameState())
@@ -212,6 +214,8 @@ function RunningGame({
 }) {
   const gameRef = useRef<GameState>(createInitialGameState())
   const filterRef = useRef(createPitchLaneFilter(measuredBaseHz, voicedThresholdRms))
+  const inputRef = useRef<InputState>(idleInput)
+  const controlAccumulatorRef = useRef(CONTROL_TICK_MS)
   const lastTimeRef = useRef<number | null>(null)
   const finishedRef = useRef(false)
   const [game, setGame] = useState(gameRef.current)
@@ -225,12 +229,20 @@ function RunningGame({
       const dtMs = Math.min(50, now - last)
       lastTimeRef.current = now
 
-      const pitchFrame = mic.samplePitch()
-      const nextInput = updatePitchLaneFilter(filterRef.current, pitchFrame, dtMs)
-      const nextGame = updateGameState(gameRef.current, nextInput.lane, dtMs)
+      controlAccumulatorRef.current += dtMs
+      if (controlAccumulatorRef.current >= CONTROL_TICK_MS) {
+        const controlDtMs = controlAccumulatorRef.current
+        controlAccumulatorRef.current = 0
+
+        const pitchFrame = mic.samplePitch()
+        const nextInput = updatePitchLaneFilter(filterRef.current, pitchFrame, controlDtMs)
+        inputRef.current = nextInput
+        setInput(nextInput)
+      }
+
+      const nextGame = updateGameState(gameRef.current, inputRef.current.lane, dtMs)
 
       gameRef.current = nextGame
-      setInput(nextInput)
       setGame(nextGame)
 
       if (nextGame.finished && !finishedRef.current) {
