@@ -335,45 +335,44 @@ function GameScene({
 
   return (
     <section className={preview ? 'game-screen game-screen-preview' : 'game-screen'}>
-      <div className="hud">
-        <div>
-          <span>Baseline</span>
-          <strong>{measuredBaseHz ? `${Math.round(measuredBaseHz)} Hz` : '...'}</strong>
-        </div>
-        <div>
-          <span>Current</span>
-          <strong>{input.pitchHz ? `${Math.round(input.pitchHz)} Hz` : '...'}</strong>
-        </div>
-        <div className="debug-card">
-          <span>Raw</span>
-          <strong>{input.rawPitchHz ? `${Math.round(input.rawPitchHz)} Hz` : '...'}</strong>
-          <small>
-            {Math.round(input.rawConfidence * 100)}% · {formatPitchStatus(input.pitchStatus)}
-          </small>
-        </div>
-        <div className="volume-card">
-          <span>Loudness</span>
-          <strong>{Math.round(input.volume * 100)}%</strong>
-          <div className="volume-meter" aria-label="baaah loudness">
-            <div className="volume-fill" style={{ width: `${Math.round(input.volume * 100)}%` }} />
-          </div>
-        </div>
-        <div className="intent-card">
-          <span>Move</span>
-          <strong>{input.voiced ? input.label : '?'}</strong>
-          <div className="intent-meter" aria-label="lane intent">
-            <div className="intent-fill" style={{ width: `${Math.round(input.intentProgress * 100)}%` }} />
-          </div>
-        </div>
-        <PitchWave input={input} measuredBaseHz={measuredBaseHz} />
-      </div>
-
       <div ref={courseRef} className="course" aria-label="Baaah runner course">
-        {onResetBaseline && (
-          <button className="reset-baseline-button" type="button" onClick={onResetBaseline}>
-            Reset Voice
-          </button>
-        )}
+        <div className="course-top-status">
+          {onResetBaseline && (
+            <button className="reset-baseline-button" type="button" onClick={onResetBaseline}>
+              Reset Voice
+            </button>
+          )}
+          <StatusPill label="Baseline" value={measuredBaseHz ? `${Math.round(measuredBaseHz)} Hz` : '...'} />
+        </div>
+
+        <div className="course-audio-status">
+          <PitchWave input={input} measuredBaseHz={measuredBaseHz} />
+          <div className="audio-readouts">
+            <StatusPill label="Current" value={input.pitchHz ? `${Math.round(input.pitchHz)} Hz` : '...'} />
+            <div className="status-pill status-pill-wide">
+              <span>Loudness</span>
+              <strong>{Math.round(input.volume * 100)}%</strong>
+              <div className="volume-meter" aria-label="baaah loudness">
+                <div className="volume-fill" style={{ width: `${Math.round(input.volume * 100)}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <dl className="raw-debug" aria-label="raw pitch debug">
+          <div>
+            <dt>Raw</dt>
+            <dd>{input.rawPitchHz ? `${Math.round(input.rawPitchHz)} Hz` : '...'}</dd>
+          </div>
+          <div>
+            <dt>Conf</dt>
+            <dd>{Math.round(input.rawConfidence * 100)}%</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>{formatPitchStatus(input.pitchStatus)}</dd>
+          </div>
+        </dl>
 
         <div className="skyline">☁️ ☁️ ☁️</div>
         <LaneGuide top={23} />
@@ -414,6 +413,15 @@ function GameScene({
   )
 }
 
+function StatusPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="status-pill">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
 function PitchWave({
   input,
   measuredBaseHz,
@@ -438,7 +446,9 @@ function PitchWave({
 }
 
 function formatPitchStatus(status: InputState['pitchStatus']): string {
-  if (status === 'low-confidence') return 'confidence'
+  if (status === 'ok') return 'OK'
+  if (status === 'none') return 'none'
+  if (status === 'low-confidence') return 'weak'
   if (status === 'too-low') return 'low'
   if (status === 'too-high') return 'high'
   return status
