@@ -112,19 +112,33 @@ export class MicrophonePitchController {
   samplePitch(): PitchFrame {
     this.analyser.getFloatTimeDomainData(this.buffer)
     const [pitchHz, confidence] = this.detector.findPitch(this.buffer, this.audioContext.sampleRate)
+    const rawPitchHz = Number.isFinite(pitchHz) ? pitchHz : null
+    const rawConfidence = Number.isFinite(confidence) ? confidence : 0
     const rms = calculateRms(this.buffer)
     const volume = calculateVolumeLevel(this.buffer)
+    const pitchStatus = getPitchStatus(rawPitchHz, rawConfidence)
 
-    if (
-      !Number.isFinite(pitchHz) ||
-      pitchHz < MIN_PITCH_HZ ||
-      pitchHz > MAX_PITCH_HZ ||
-      confidence < MIN_CONFIDENCE
-    ) {
-      return { pitchHz: null, confidence, volume, rms }
+    if (pitchStatus !== 'ok') {
+      return {
+        pitchHz: null,
+        rawPitchHz,
+        confidence: rawConfidence,
+        rawConfidence,
+        pitchStatus,
+        volume,
+        rms,
+      }
     }
 
-    return { pitchHz, confidence, volume, rms }
+    return {
+      pitchHz: rawPitchHz,
+      rawPitchHz,
+      confidence: rawConfidence,
+      rawConfidence,
+      pitchStatus,
+      volume,
+      rms,
+    }
   }
 
   async calibrate({
@@ -195,6 +209,17 @@ export class MicrophonePitchController {
       await this.audioContext.close()
     }
   }
+}
+
+function getPitchStatus(
+  pitchHz: number | null,
+  confidence: number,
+): PitchFrame['pitchStatus'] {
+  if (pitchHz === null) return 'none'
+  if (pitchHz < MIN_PITCH_HZ) return 'too-low'
+  if (pitchHz > MAX_PITCH_HZ) return 'too-high'
+  if (confidence < MIN_CONFIDENCE) return 'low-confidence'
+  return 'ok'
 }
 
 function makeAudioConstraints(supportedConstraints: MediaTrackSupportedConstraints): MediaTrackConstraints {

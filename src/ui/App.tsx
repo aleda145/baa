@@ -19,7 +19,10 @@ type Screen = 'intro' | 'calibrating' | 'running' | 'results' | 'error'
 const idleInput: InputState = {
   voiced: false,
   pitchHz: null,
+  rawPitchHz: null,
   confidence: 0,
+  rawConfidence: 0,
+  pitchStatus: 'none',
   volume: 0,
   lane: 0,
   intentLane: 0,
@@ -327,6 +330,13 @@ function GameScene({
           <span>Current</span>
           <strong>{input.pitchHz ? `${Math.round(input.pitchHz)} Hz` : '...'}</strong>
         </div>
+        <div className="debug-card">
+          <span>Raw</span>
+          <strong>{input.rawPitchHz ? `${Math.round(input.rawPitchHz)} Hz` : '...'}</strong>
+          <small>
+            {Math.round(input.rawConfidence * 100)}% · {formatPitchStatus(input.pitchStatus)}
+          </small>
+        </div>
         <div className="volume-card">
           <span>Loudness</span>
           <strong>{Math.round(input.volume * 100)}%</strong>
@@ -405,6 +415,13 @@ function PitchWave({
       </svg>
     </div>
   )
+}
+
+function formatPitchStatus(status: InputState['pitchStatus']): string {
+  if (status === 'low-confidence') return 'confidence'
+  if (status === 'too-low') return 'low'
+  if (status === 'too-high') return 'high'
+  return status
 }
 
 function getPitchWavePoints(input: InputState, measuredBaseHz: number | null): string {

@@ -20,7 +20,10 @@ type LaneMeters = {
 
 export type PitchFrame = {
   pitchHz: number | null
+  rawPitchHz?: number | null
   confidence: number
+  rawConfidence?: number
+  pitchStatus?: InputState['pitchStatus']
   volume: number
   rms: number
 }
@@ -188,7 +191,10 @@ export function updatePitchLaneFilter(
   return {
     voiced,
     pitchHz: smoothedPitchHz,
+    rawPitchHz: frame.rawPitchHz ?? frame.pitchHz,
     confidence: frame.confidence,
+    rawConfidence: frame.rawConfidence ?? frame.confidence,
+    pitchStatus: frame.pitchStatus ?? (frame.pitchHz === null ? 'none' : 'ok'),
     volume: smoothedVolume,
     lane,
     intentLane,

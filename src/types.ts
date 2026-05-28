@@ -3,7 +3,10 @@ export type Lane = -1 | 0 | 1
 export type InputState = {
   voiced: boolean
   pitchHz: number | null
+  rawPitchHz: number | null
   confidence: number
+  rawConfidence: number
+  pitchStatus: 'ok' | 'none' | 'low-confidence' | 'too-low' | 'too-high'
   volume: number
   lane: Lane
   intentLane: Lane
