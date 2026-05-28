@@ -4,12 +4,14 @@ import {
   COURSE_LENGTH,
   COURSE_START_X,
   createInitialGameState,
+  createPracticeGameState,
   distanceToScreenX,
   getCourseItems,
   HIT_WINDOW,
   lanePositionToPercent,
   makeCourseItems,
   updateGameState,
+  updatePracticeGameState,
 } from './engine'
 import type { GameState, Lane } from '../types'
 
@@ -61,6 +63,20 @@ describe('runner engine', () => {
     expect(next.sheep.targetLane).toBe(1)
     expect(next.sheep.lanePosition).toBeGreaterThan(0)
     expect(next.progress).toBeGreaterThan(0)
+  })
+
+  it('loops practice runs without finishing or adding wolves', () => {
+    const state = createPracticeGameState()
+    state.progress = COURSE_LENGTH - 1
+    state.sheep.lane = -1
+    state.sheep.lanePosition = -1
+
+    const next = updatePracticeGameState(state, -1, 1000)
+
+    expect(next.finished).toBe(false)
+    expect(next.items).toHaveLength(0)
+    expect(next.progress).toBeLessThan(COURSE_LENGTH)
+    expect(next.sheep.lane).toBe(-1)
   })
 
   it('only collides with items in the sheep lane', () => {

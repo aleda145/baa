@@ -213,6 +213,53 @@ button {
   max-width: calc(100% - 28px);
 }
 
+.onboarding-prompt {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  z-index: 12;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: min(340px, calc(100% - 220px));
+  transform: translateX(-50%);
+  color: #182015;
+  text-align: center;
+  pointer-events: none;
+}
+
+.onboarding-prompt strong {
+  padding: 7px 12px;
+  border: 1px solid rgba(56, 99, 45, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 5px 14px rgba(42, 80, 34, 0.08);
+  font-size: clamp(15px, 2.2vw, 18px);
+  line-height: 1.1;
+}
+
+.onboarding-prompt span {
+  color: rgba(24, 32, 21, 0.78);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.onboarding-hold-meter {
+  width: min(180px, 100%);
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(82, 100, 73, 0.18);
+}
+
+.onboarding-hold-meter div {
+  height: 100%;
+  border-radius: inherit;
+  background: #225c3a;
+  transition: width 80ms linear;
+}
+
 .audio-meter {
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(56, 99, 45, 0.14);
@@ -558,6 +605,11 @@ button {
 
   .course-audio-status {
     bottom: 10px;
+  }
+
+  .onboarding-prompt {
+    top: 84px;
+    width: min(280px, calc(100% - 20px));
   }
 
   .raw-debug {

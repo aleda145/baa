@@ -71,6 +71,13 @@ export function createInitialGameState(): GameState {
   }
 }
 
+export function createPracticeGameState(): GameState {
+  return {
+    ...createInitialGameState(),
+    items: [],
+  }
+}
+
 export function getCourseItems(state: GameState): Array<GameItem & { screenXPercent: number }> {
   return state.items
     .filter((item) => !item.collectedOrHit)
@@ -78,6 +85,34 @@ export function getCourseItems(state: GameState): Array<GameItem & { screenXPerc
       ...item,
       screenXPercent: distanceToScreenX(item.distance),
     }))
+}
+
+export function updatePracticeGameState(state: GameState, targetLane: Lane, dtMs: number): GameState {
+  const next: GameState = {
+    ...state,
+    elapsedMs: state.elapsedMs + dtMs,
+    sheep: { ...state.sheep, targetLane },
+    items: [],
+    events: [],
+    finished: false,
+    outcome: 'running',
+    finishTimeMs: null,
+  }
+
+  next.sheep.tumbleMs = Math.max(0, next.sheep.tumbleMs - dtMs)
+  next.sheep.blinkMs = Math.max(0, next.sheep.blinkMs - dtMs)
+
+  const laneEase = 1 - Math.exp(-dtMs / LANE_EASE_MS)
+  next.sheep.lanePosition += (targetLane - next.sheep.lanePosition) * laneEase
+  next.sheep.lane = nearestLane(next.sheep.lanePosition)
+  next.sheep.speed = BASE_SPEED
+
+  next.progress += (BASE_SPEED * dtMs) / 1000
+  if (next.progress >= COURSE_LENGTH) {
+    next.progress %= COURSE_LENGTH
+  }
+
+  return next
 }
 
 export function updateGameState(state: GameState, targetLane: Lane, dtMs: number): GameState {

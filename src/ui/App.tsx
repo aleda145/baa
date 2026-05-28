@@ -3,19 +3,28 @@ import { Volume2 } from 'lucide-react'
 import notoSheepUrl from '../assets/noto-sheep.svg'
 import notoWolfUrl from '../assets/noto-wolf.svg'
 import { MicrophonePitchController } from '../audio/microphone'
-import { createPitchLaneFilter, updatePitchLaneFilter, type PitchFrame } from '../audio/pitchLane'
+import {
+  HIGH_THRESHOLD_SEMITONES,
+  LOW_THRESHOLD_SEMITONES,
+  createPitchLaneFilter,
+  updatePitchLaneFilter,
+  type PitchFrame,
+} from '../audio/pitchLane'
 import {
   COURSE_LENGTH,
   createInitialGameState,
+  createPracticeGameState,
   distanceToScreenX,
   getCourseItems,
   lanePositionToPercent,
   laneToPercent,
   updateGameState,
+  updatePracticeGameState,
 } from '../game/engine'
-import type { GameState, InputState } from '../types'
+import type { GameState, InputState, Lane } from '../types'
 
-type Screen = 'intro' | 'calibrating' | 'running' | 'results' | 'error'
+type Screen = 'intro' | 'calibrating' | 'onboarding' | 'running' | 'results' | 'error'
+type OnboardingStep = 'low' | 'high' | 'ready'
 
 const idleInput: InputState = {
   voiced: false,
@@ -33,6 +42,9 @@ const idleInput: InputState = {
 }
 
 const CONTROL_TICK_MS = 100
+const ONBOARDING_HINT_MS = 5200
+const ONBOARDING_HOLD_MS = 500
+const ONBOARDING_READY_MS = 1000
 
 function inputFromPitchFrame(frame: PitchFrame): InputState {
   const voiced = frame.pitchHz !== null
@@ -112,7 +124,7 @@ export function App() {
     setCalibrationProgress(1)
     setMeasuredBaseHz(calibration.measuredBaseHz)
     setVoicedThresholdRms(calibration.voicedThresholdRms)
-    setScreen('running')
+    setScreen('onboarding')
   }
 
   const retry = () => {
@@ -126,6 +138,11 @@ export function App() {
 
   const isRunning =
     screen === 'running' &&
+    micRef.current !== null &&
+    measuredBaseHz !== null &&
+    voicedThresholdRms !== null
+  const isOnboarding =
+    screen === 'onboarding' &&
     micRef.current !== null &&
     measuredBaseHz !== null &&
     voicedThresholdRms !== null
@@ -145,16 +162,35 @@ export function App() {
             setScreen('results')
           }}
         />
+      ) : isOnboarding ? (
+        <OnboardingGame
+          key={`${measuredBaseHz}-${screen}`}
+          measuredBaseHz={measuredBaseHz!}
+          voicedThresholdRms={voicedThresholdRms!}
+          mic={micRef.current!}
+          onResetBaseline={() => {
+            void calibrate(micRef.current)
+          }}
+          onComplete={() => {
+            setScreen('running')
+          }}
+        />
       ) : (
         <GameScene
           game={previewGameRef.current}
           input={setupInput}
           measuredBaseHz={measuredBaseHz}
+          visibleLanes={screen === 'calibrating' ? [0] : [1, 0, -1]}
+          showBarn={screen !== 'calibrating'}
+          showItems={screen !== 'calibrating'}
+          prompt={screen === 'calibrating' ? 'Say baaah' : ''}
+          promptHint={screen === 'calibrating' ? message : ''}
+          promptProgress={screen === 'calibrating' ? calibrationProgress : null}
           preview
         />
       )}
 
-      {!isRunning && (
+      {!isRunning && !isOnboarding && screen !== 'calibrating' && (
         <div className="screen-overlay">
           {screen === 'intro' && (
             <SetupPanel
@@ -164,13 +200,6 @@ export function App() {
               onPrimary={requestMic}
             >
               <p>Say baaah</p>
-            </SetupPanel>
-          )}
-
-          {screen === 'calibrating' && (
-            <SetupPanel title="Say baaah" eyebrow="👂" buttonLabel="..." disabled secondaryText={message}>
-              <p>Say baaah</p>
-              <HoldMeter progress={calibrationProgress} />
             </SetupPanel>
           )}
 
@@ -224,12 +253,210 @@ function SetupPanel({
   )
 }
 
-function HoldMeter({ progress }: { progress: number }) {
+function OnboardingGame({
+  measuredBaseHz,
+  voicedThresholdRms,
+  mic,
+  onResetBaseline,
+  onComplete,
+}: {
+  measuredBaseHz: number
+  voicedThresholdRms: number
+  mic: MicrophonePitchController
+  onResetBaseline: () => void
+  onComplete: () => void
+}) {
+  const gameRef = useRef<GameState>(createPracticeGameState())
+  const filterRef = useRef(createPitchLaneFilter(measuredBaseHz, voicedThresholdRms))
+  const inputRef = useRef<InputState>(idleInput)
+  const controlAccumulatorRef = useRef(CONTROL_TICK_MS)
+  const lastTimeRef = useRef<number | null>(null)
+  const stepStartedAtRef = useRef(0)
+  const lowPitchRef = useRef<number | null>(null)
+  const highPitchRef = useRef<number | null>(null)
+  const completedRef = useRef(false)
+  const readyStartedAtRef = useRef<number | null>(null)
+  const holdMsRef = useRef(0)
+  const [step, setStep] = useState<OnboardingStep>('low')
+  const stepRef = useRef<OnboardingStep>('low')
+  const [showHint, setShowHint] = useState(false)
+  const [holdProgress, setHoldProgress] = useState(0)
+  const [game, setGame] = useState(gameRef.current)
+  const [input, setInput] = useState<InputState>(idleInput)
+
+  useEffect(() => {
+    let animationFrame = 0
+
+    const tick = (now: number) => {
+      const last = lastTimeRef.current ?? now
+      const dtMs = Math.min(50, now - last)
+      lastTimeRef.current = now
+
+      if (stepStartedAtRef.current === 0) {
+        stepStartedAtRef.current = now
+      }
+
+      controlAccumulatorRef.current += dtMs
+      if (controlAccumulatorRef.current >= CONTROL_TICK_MS) {
+        const controlDtMs = controlAccumulatorRef.current
+        controlAccumulatorRef.current = 0
+
+        const pitchFrame = mic.samplePitch()
+        const nextInput = updatePitchLaneFilter(filterRef.current, pitchFrame, controlDtMs)
+        inputRef.current = nextInput
+        setInput(nextInput)
+      }
+
+      const targetLane = onboardingTargetLane(stepRef.current, inputRef.current)
+      const nextGame = updatePracticeGameState(gameRef.current, targetLane, dtMs)
+      gameRef.current = nextGame
+      setGame(nextGame)
+
+      if (now - stepStartedAtRef.current >= ONBOARDING_HINT_MS) {
+        setShowHint(true)
+      }
+
+      const holdingPitch = onboardingPitchHeld(stepRef.current, inputRef.current, lowPitchRef.current)
+      if (stepRef.current === 'low' || stepRef.current === 'high') {
+        holdMsRef.current = holdingPitch ? Math.min(ONBOARDING_HOLD_MS, holdMsRef.current + dtMs) : 0
+        setHoldProgress(holdMsRef.current / ONBOARDING_HOLD_MS)
+      }
+
+      if (
+        stepRef.current === 'low' &&
+        holdMsRef.current >= ONBOARDING_HOLD_MS &&
+        completedLowPitch(inputRef.current, nextGame)
+      ) {
+        lowPitchRef.current = inputRef.current.pitchHz
+        stepRef.current = 'high'
+        setStep('high')
+        setShowHint(false)
+        holdMsRef.current = 0
+        setHoldProgress(0)
+        stepStartedAtRef.current = now
+      } else if (
+        stepRef.current === 'high' &&
+        holdMsRef.current >= ONBOARDING_HOLD_MS &&
+        completedHighPitch(inputRef.current, nextGame, lowPitchRef.current) &&
+        !completedRef.current
+      ) {
+        highPitchRef.current = inputRef.current.pitchHz
+        stepRef.current = 'ready'
+        setStep('ready')
+        setShowHint(false)
+        holdMsRef.current = 0
+        setHoldProgress(0)
+        stepStartedAtRef.current = now
+        readyStartedAtRef.current = now
+      } else if (stepRef.current === 'ready') {
+        if (
+          readyStartedAtRef.current !== null &&
+          now - readyStartedAtRef.current >= ONBOARDING_READY_MS &&
+          !completedRef.current
+        ) {
+          completedRef.current = true
+          onComplete()
+          return
+        }
+      }
+
+      animationFrame = requestAnimationFrame(tick)
+    }
+
+    animationFrame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(animationFrame)
+  }, [mic, onComplete])
+
   return (
-    <div className="hold-meter" aria-label="baaah hold progress">
-      <div className="hold-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
-    </div>
+    <GameScene
+      game={game}
+      input={input}
+      measuredBaseHz={measuredBaseHz}
+      onResetBaseline={onResetBaseline}
+      visibleLanes={step === 'low' ? [0, -1] : [1, 0, -1]}
+      showBarn={false}
+      showItems={false}
+      prompt={onboardingPrompt(step)}
+      promptHint={showHint ? 'Try a bigger pitch change, or tap Reset.' : ''}
+      promptProgress={step === 'ready' ? null : holdProgress}
+    />
   )
+}
+
+function onboardingPitchHeld(
+  step: OnboardingStep,
+  input: InputState,
+  lowPitchHz: number | null,
+): boolean {
+  if (step === 'low') {
+    return lowPitchHeld(input)
+  }
+
+  if (step === 'high') {
+    return highPitchHeld(input, lowPitchHz)
+  }
+
+  return false
+}
+
+function lowPitchHeld(input: InputState): boolean {
+  return (
+    input.voiced &&
+    input.pitchHz !== null &&
+    input.pitchOffsetSemitones !== null &&
+    input.pitchOffsetSemitones <= LOW_THRESHOLD_SEMITONES
+  )
+}
+
+function highPitchHeld(input: InputState, lowPitchHz: number | null): boolean {
+  return (
+    input.voiced &&
+    input.pitchHz !== null &&
+    lowPitchHz !== null &&
+    input.pitchHz > lowPitchHz &&
+    input.pitchOffsetSemitones !== null &&
+    input.pitchOffsetSemitones >= HIGH_THRESHOLD_SEMITONES
+  )
+}
+
+function onboardingTargetLane(step: OnboardingStep, input: InputState): Lane {
+  if (step === 'ready') {
+    return input.lane
+  }
+
+  if (step === 'low') {
+    return input.pitchOffsetSemitones !== null && input.pitchOffsetSemitones <= LOW_THRESHOLD_SEMITONES
+      ? -1
+      : 0
+  }
+
+  if (input.pitchOffsetSemitones !== null && input.pitchOffsetSemitones >= HIGH_THRESHOLD_SEMITONES) {
+    return 1
+  }
+
+  if (input.pitchOffsetSemitones !== null && input.pitchOffsetSemitones <= LOW_THRESHOLD_SEMITONES) {
+    return -1
+  }
+
+  return 0
+}
+
+function onboardingPrompt(step: OnboardingStep): string {
+  if (step === 'low') return 'Make a lower pitch'
+  if (step === 'high') return 'Make a higher pitch'
+  return 'Avoid the wolves!'
+}
+
+function completedLowPitch(input: InputState, game: GameState): boolean {
+  return lowPitchHeld(input) && game.sheep.lane === -1
+}
+
+function completedHighPitch(
+  input: InputState,
+  game: GameState,
+  lowPitchHz: number | null,
+): boolean {
+  return highPitchHeld(input, lowPitchHz) && game.sheep.lane === 1
 }
 
 function RunningGame({
@@ -306,18 +533,30 @@ function GameScene({
   input,
   measuredBaseHz,
   onResetBaseline,
+  visibleLanes = [1, 0, -1],
+  showBarn = true,
+  showItems = true,
+  prompt = '',
+  promptHint = '',
+  promptProgress = null,
   preview = false,
 }: {
   game: GameState
   input: InputState
   measuredBaseHz: number | null
   onResetBaseline?: () => void
+  visibleLanes?: Lane[]
+  showBarn?: boolean
+  showItems?: boolean
+  prompt?: string
+  promptHint?: string
+  promptProgress?: number | null
   preview?: boolean
 }) {
   const courseRef = useRef<HTMLDivElement | null>(null)
   const [courseSize, setCourseSize] = useState({ width: 0, height: 0 })
   const sheepTop = lanePositionToPercent(game.sheep.lanePosition)
-  const courseItems = getCourseItems(game)
+  const courseItems = showItems ? getCourseItems(game) : []
   const sheepX = distanceToScreenX(game.progress)
   const barnX = distanceToScreenX(COURSE_LENGTH)
   const sheepClass = [
@@ -378,6 +617,18 @@ function GameScene({
           <AudioMeter input={input} measuredBaseHz={measuredBaseHz} />
         </div>
 
+        {prompt && (
+          <div className="onboarding-prompt">
+            <strong>{prompt}</strong>
+            {promptProgress !== null && (
+              <div className="onboarding-hold-meter" aria-label="pitch hold progress">
+                <div style={{ width: `${Math.round(promptProgress * 100)}%` }} />
+              </div>
+            )}
+            {promptHint && <span>{promptHint}</span>}
+          </div>
+        )}
+
         <dl className="raw-debug" aria-label="raw pitch debug">
           <div>
             <dt>Raw</dt>
@@ -394,9 +645,9 @@ function GameScene({
         </dl>
 
         <div className="skyline">☁️ ☁️ ☁️</div>
-        <LaneGuide top={23} />
-        <LaneGuide top={50} />
-        <LaneGuide top={77} />
+        {visibleLanes.map((lane) => (
+          <LaneGuide key={lane} top={laneToPercent(lane)} />
+        ))}
 
         {courseItems.map((item) => (
           <div
@@ -409,9 +660,11 @@ function GameScene({
           </div>
         ))}
 
-        <div className="barn" style={{ left: `${barnX}%` }} aria-label="barn">
-          🏠
-        </div>
+        {showBarn && (
+          <div className="barn" style={{ left: `${barnX}%` }} aria-label="barn">
+            🏠
+          </div>
+        )}
 
         <div className="sheep-x" style={sheepXStyle}>
           <div className="baa-bubble-wrap" style={sheepYStyle}>
