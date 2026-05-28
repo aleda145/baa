@@ -278,7 +278,6 @@ function GameScene({
   const courseItems = getCourseItems(game)
   const sheepX = distanceToScreenX(game.progress)
   const barnX = distanceToScreenX(COURSE_LENGTH)
-  const progressPercent = Math.min(100, (game.progress / COURSE_LENGTH) * 100)
   const sheepClass = [
     'sheep',
     game.sheep.tumbleMs > 0 ? 'sheep-tumble' : '',
@@ -380,10 +379,6 @@ function GameScene({
             <span key={event.id}>{event.message}</span>
           ))}
         </div>
-      </div>
-
-      <div className="progress-shell" aria-label="course progress">
-        <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
       </div>
     </section>
   )

@@ -389,20 +389,6 @@ button {
   animation: pop 400ms ease-out;
 }
 
-.progress-shell {
-  height: 14px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.66);
-  border: 2px solid rgba(56, 99, 45, 0.18);
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: #225c3a;
-  transition: width 80ms linear;
-}
-
 .status-strip {
   min-height: 42px;
 }
