@@ -448,12 +448,14 @@ function AudioMeter({
 
   return (
     <div className="audio-meter">
-      <strong className="audio-meter-frequency">{currentHz}</strong>
-      <div className="pitch-wave-wrap">
-        <svg className="pitch-wave" viewBox="0 0 144 46" role="img" aria-label="pitch wave">
-          <line className="pitch-wave-center" x1="0" y1="23" x2="144" y2="23" />
-          <polyline className={waveClass} points={points} />
-        </svg>
+      <div className="pitch-wave-row">
+        <strong className="audio-meter-frequency">{currentHz}</strong>
+        <div className="pitch-wave-wrap">
+          <svg className="pitch-wave" viewBox="0 0 144 46" role="img" aria-label="pitch wave">
+            <line className="pitch-wave-center" x1="0" y1="23" x2="144" y2="23" />
+            <polyline className={waveClass} points={points} />
+          </svg>
+        </div>
       </div>
       <div className="volume-meter" aria-label="baaah loudness">
         <div className="volume-fill" style={{ width: `${loudnessPercent}%` }} />
