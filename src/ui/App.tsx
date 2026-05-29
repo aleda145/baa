@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Mic, Volume2 } from "lucide-react";
+import notoHeartUrl from "../assets/noto-heart.svg";
 import notoSheepUrl from "../assets/noto-sheep.svg";
 import notoWheatUrl from "../assets/noto-wheat.svg";
 import notoWolfUrl from "../assets/noto-wolf.svg";
@@ -53,6 +54,7 @@ const CONTROL_TICK_MS = 100;
 const ONBOARDING_HINT_MS = 5200;
 const ONBOARDING_HOLD_MS = 500;
 const ONBOARDING_READY_MS = 1000;
+const LEVEL_FINISH_DELAY_MS = 750;
 
 function inputFromPitchFrame(frame: PitchFrame): InputState {
   const voiced = frame.pitchHz !== null;
@@ -227,7 +229,9 @@ export function App() {
           lowBaaHz={lowBaaHz}
           highBaaHz={highBaaHz}
           level={activeLevel}
-          visibleLanes={screen === "intro" || screen === "calibrating" ? [0] : [1, 0, -1]}
+          visibleLanes={
+            screen === "intro" || screen === "calibrating" ? [0] : [1, 0, -1]
+          }
           showBarn={screen !== "intro" && screen !== "calibrating"}
           showItems={screen !== "intro" && screen !== "calibrating"}
           prompt={
@@ -591,7 +595,9 @@ function RunningGame({
   onResetBaseline: () => void;
   onFinish: () => void;
 }) {
-  const gameRef = useRef<GameState>(createInitialGameState(level.createItems()));
+  const gameRef = useRef<GameState>(
+    createInitialGameState(level.createItems()),
+  );
   const filterRef = useRef(
     createPitchLaneFilter(measuredBaseHz, voicedThresholdRms),
   );
@@ -599,8 +605,10 @@ function RunningGame({
   const controlAccumulatorRef = useRef(CONTROL_TICK_MS);
   const lastTimeRef = useRef<number | null>(null);
   const finishedRef = useRef(false);
+  const finishTimerRef = useRef<number | null>(null);
   const [game, setGame] = useState(gameRef.current);
   const [input, setInput] = useState<InputState>(idleInput);
+  const [isCelebrating, setIsCelebrating] = useState(false);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -637,7 +645,10 @@ function RunningGame({
 
       if (nextGame.finished && !finishedRef.current) {
         finishedRef.current = true;
-        onFinish();
+        setIsCelebrating(true);
+        finishTimerRef.current = window.setTimeout(() => {
+          onFinish();
+        }, LEVEL_FINISH_DELAY_MS);
         return;
       }
 
@@ -645,7 +656,12 @@ function RunningGame({
     };
 
     animationFrame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animationFrame);
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      if (finishTimerRef.current !== null) {
+        window.clearTimeout(finishTimerRef.current);
+      }
+    };
   }, [level, mic, onFinish]);
 
   return (
@@ -657,6 +673,16 @@ function RunningGame({
       highBaaHz={highBaaHz}
       level={level}
       onResetBaseline={onResetBaseline}
+      sheepBubble={
+        isCelebrating ? (
+          <img
+            className="bubble-emoji-asset"
+            src={notoHeartUrl}
+            alt="heart"
+            draggable={false}
+          />
+        ) : undefined
+      }
     />
   );
 }
@@ -768,7 +794,10 @@ function GameScene({
           </button>
         </div>
 
-        <div className="level-badge" aria-label={`Level ${level.id}: ${level.name}`}>
+        <div
+          className="level-badge"
+          aria-label={`Level ${level.id}: ${level.name}`}
+        >
           <span>Level {level.id}</span>
           <strong>{level.shortName}</strong>
           <em>{level.description}</em>
@@ -852,7 +881,12 @@ function GameScene({
             style={{ left: `${finishX}%`, top: `${finishTop}%` }}
             aria-label="wheat"
           >
-            <img className="emoji-asset" src={notoWheatUrl} alt="" draggable={false} />
+            <img
+              className="emoji-asset"
+              src={notoWheatUrl}
+              alt=""
+              draggable={false}
+            />
           </div>
         )}
 

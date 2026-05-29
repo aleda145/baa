@@ -661,6 +661,12 @@ button {
   gap: 3px;
 }
 
+.bubble-emoji-asset {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
 .item {
   z-index: 4;
   width: clamp(26px, 4vw, 46px);
