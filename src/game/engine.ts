@@ -10,7 +10,7 @@ export const LANE_EASE_MS = 210
 const laneOrder: Lane[] = [1, 0, -1]
 
 const eventMessages: Record<GameEventKind, string> = {
-  'wolf-hit': 'back!',
+  'wolf-hit': 'Again!',
   finish: 'barn!',
 }
 

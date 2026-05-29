@@ -641,20 +641,21 @@ button {
 .events {
   position: absolute;
   left: 50%;
-  top: 8%;
+  top: 18px;
   transform: translateX(-50%);
   display: flex;
   gap: 8px;
-  z-index: 10;
+  z-index: 12;
 }
 
 .events span {
-  padding: 6px 10px;
+  padding: 7px 12px;
   border-radius: 8px;
-  background: rgba(255, 253, 230, 0.9);
-  border: 2px solid rgba(42, 89, 36, 0.16);
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(56, 99, 45, 0.14);
   font-weight: 900;
   animation: pop 400ms ease-out;
+  box-shadow: 0 5px 14px rgba(42, 80, 34, 0.08);
 }
 
 @keyframes sheep-run {
