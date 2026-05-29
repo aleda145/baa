@@ -6,6 +6,7 @@ export const COURSE_END_X = 93
 export const BASE_SPEED = 600
 export const HIT_WINDOW = 24
 export const LANE_EASE_MS = 210
+export const BARN_LANE: Lane = 0
 
 const laneOrder: Lane[] = [1, 0, -1]
 
@@ -162,11 +163,16 @@ export function updateGameState(state: GameState, targetLane: Lane, dtMs: number
   }
 
   if (next.progress >= COURSE_LENGTH) {
-    next.finished = true
-    next.outcome = 'won'
-    next.finishTimeMs = next.elapsedMs
-    next.progress = COURSE_LENGTH
-    addEvent(next, 'finish')
+    if (next.sheep.lane === BARN_LANE) {
+      next.finished = true
+      next.outcome = 'won'
+      next.finishTimeMs = next.elapsedMs
+      next.progress = COURSE_LENGTH
+      addEvent(next, 'finish')
+    } else {
+      next.progress %= COURSE_LENGTH
+      next.items = makeCourseItems()
+    }
   }
 
   return next

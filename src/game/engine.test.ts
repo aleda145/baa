@@ -42,10 +42,10 @@ describe('runner engine', () => {
   })
 
   it('maps continuous lane positions into continuous screen Y coordinates', () => {
-    expect(lanePositionToPercent(1)).toBe(23)
+    expect(lanePositionToPercent(1)).toBe(32)
     expect(lanePositionToPercent(0)).toBe(50)
-    expect(lanePositionToPercent(-1)).toBe(77)
-    expect(lanePositionToPercent(0.5)).toBe(36.5)
+    expect(lanePositionToPercent(-1)).toBe(68)
+    expect(lanePositionToPercent(0.5)).toBe(41)
   })
 
   it('generates wolves only', () => {
@@ -123,5 +123,22 @@ describe('runner engine', () => {
     expect(next.outcome).toBe('won')
     expect(next.finishTimeMs).not.toBeNull()
     expect(next.progress).toBe(COURSE_LENGTH)
+  })
+
+  it('loops when the sheep reaches the end outside the barn lane', () => {
+    const state = createInitialGameState()
+    state.progress = COURSE_LENGTH - 1
+    state.sheep.lane = 1
+    state.sheep.lanePosition = 1
+    state.sheep.targetLane = 1
+    state.items = state.items.map((item) => ({ ...item, missed: true }))
+
+    const next = updateGameState(state, 1, 1000)
+
+    expect(next.finished).toBe(false)
+    expect(next.outcome).toBe('running')
+    expect(next.progress).toBeLessThan(COURSE_LENGTH)
+    expect(next.sheep.lane).toBe(1)
+    expect(next.items.every((item) => !item.missed)).toBe(true)
   })
 })

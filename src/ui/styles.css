@@ -701,15 +701,19 @@ button {
 
 @media (max-width: 640px) {
   .app-shell {
-    padding: 12px;
+    padding: 12px 0;
   }
 
   .course {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
     height: min(64vh, 560px);
     min-height: 490px;
   }
 
   .game-screen {
+    width: 100%;
     padding-top: 86px;
   }
 
