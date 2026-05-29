@@ -1,9 +1,17 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Mic, Volume2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Mic, Music, Volume2 } from "lucide-react";
 import notoHeartUrl from "../assets/noto-heart.svg";
 import notoSheepUrl from "../assets/noto-sheep.svg";
 import notoWheatUrl from "../assets/noto-wheat.svg";
 import notoWolfUrl from "../assets/noto-wolf.svg";
+import {
+  BaaSampleBank,
+  BaaSampleCapture,
+  MIN_SAMPLES_FOR_BAATHOVEN,
+  logBaathovenStats,
+  playBaathoven,
+  type BaaSample,
+} from "../audio/baathoven";
 import { MicrophonePitchController } from "../audio/microphone";
 import {
   HIGH_THRESHOLD_SEMITONES,
@@ -91,6 +99,8 @@ export function App() {
   const [message, setMessage] = useState("");
   const retryTimerRef = useRef<number | null>(null);
   const autoMicStartedRef = useRef(false);
+  const baaSampleBankRef = useRef(new BaaSampleBank());
+  const [baaSamples, setBaaSamples] = useState<BaaSample[]>([]);
 
   useEffect(() => {
     return () => {
@@ -119,6 +129,45 @@ export function App() {
       setScreen("error");
     }
   };
+
+  const onBaaSample = useCallback((sample: BaaSample) => {
+    const samples = baaSampleBankRef.current.add(sample);
+    setBaaSamples(samples);
+    console.log("Baathoven accepted baa sample", {
+      id: sample.id,
+      pitchHz: Math.round(sample.basePitchHz),
+      midiNote: sample.midiNote,
+      durationMs: Math.round(sample.durationMs),
+      confidence: Number(sample.confidence.toFixed(3)),
+      rms: Number(sample.rms.toFixed(4)),
+      sampleCount: samples.length,
+      unlocked: samples.length >= MIN_SAMPLES_FOR_BAATHOVEN,
+    });
+    logBaathovenStats(samples);
+  }, []);
+
+  const playCollectedBaathoven = useCallback(async () => {
+    const mic = micRef.current;
+    const samples = baaSampleBankRef.current.list();
+
+    console.log("Baathoven button pressed", {
+      sampleCount: samples.length,
+      screen,
+    });
+    logBaathovenStats(samples);
+
+    if (!mic) {
+      console.warn("Baathoven cannot play before microphone setup.");
+      return;
+    }
+
+    try {
+      await mic.resume();
+      await playBaathoven(mic.getAudioContext(), samples);
+    } catch (error) {
+      console.warn("Baathoven playback failed", error);
+    }
+  }, [screen]);
 
   const calibrate = async (mic = micRef.current) => {
     if (!mic) return;
@@ -190,6 +239,9 @@ export function App() {
           voicedThresholdRms={voicedThresholdRms!}
           mic={micRef.current!}
           level={activeLevel}
+          baathovenSampleCount={baaSamples.length}
+          onBaaSample={onBaaSample}
+          onPlayBaathoven={playCollectedBaathoven}
           onResetBaseline={() => {
             void calibrate(micRef.current);
           }}
@@ -198,7 +250,8 @@ export function App() {
             if (nextLevel) {
               setCurrentLevelId(nextLevel.id);
             } else {
-              setScreen("results");
+              setCurrentLevelId(1);
+              setScreen("running");
             }
           }}
         />
@@ -211,6 +264,9 @@ export function App() {
           voicedThresholdRms={voicedThresholdRms!}
           mic={micRef.current!}
           level={activeLevel}
+          baathovenSampleCount={baaSamples.length}
+          onBaaSample={onBaaSample}
+          onPlayBaathoven={playCollectedBaathoven}
           onResetBaseline={() => {
             void calibrate(micRef.current);
           }}
@@ -332,6 +388,9 @@ function OnboardingGame({
   voicedThresholdRms,
   mic,
   level,
+  baathovenSampleCount,
+  onBaaSample,
+  onPlayBaathoven,
   onResetBaseline,
   onComplete,
   onLowBaa,
@@ -343,6 +402,9 @@ function OnboardingGame({
   voicedThresholdRms: number;
   mic: MicrophonePitchController;
   level: LevelDefinition;
+  baathovenSampleCount: number;
+  onBaaSample: (sample: BaaSample) => void;
+  onPlayBaathoven: () => void;
   onResetBaseline: () => void;
   onComplete: () => void;
   onLowBaa: (hz: number) => void;
@@ -358,6 +420,10 @@ function OnboardingGame({
   const stepStartedAtRef = useRef(0);
   const lowPitchRef = useRef<number | null>(null);
   const highPitchRef = useRef<number | null>(null);
+  const baaCaptureRef = useRef<BaaSampleCapture | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  const onLowBaaRef = useRef(onLowBaa);
+  const onHighBaaRef = useRef(onHighBaa);
   const completedRef = useRef(false);
   const readyStartedAtRef = useRef<number | null>(null);
   const holdMsRef = useRef(0);
@@ -369,6 +435,20 @@ function OnboardingGame({
   const [input, setInput] = useState<InputState>(idleInput);
 
   useEffect(() => {
+    onCompleteRef.current = onComplete;
+    onLowBaaRef.current = onLowBaa;
+    onHighBaaRef.current = onHighBaa;
+  }, [onComplete, onHighBaa, onLowBaa]);
+
+  useEffect(() => {
+    const capture = new BaaSampleCapture(mic, {
+      voicedThresholdRms,
+      onSample: onBaaSample,
+      onRejected: (reason, summary) => {
+        console.debug("Baathoven rejected onboarding baa", { reason, summary });
+      },
+    });
+    baaCaptureRef.current = capture;
     let animationFrame = 0;
 
     const tick = (now: number) => {
@@ -386,6 +466,7 @@ function OnboardingGame({
         controlAccumulatorRef.current = 0;
 
         const pitchFrame = mic.samplePitch();
+        baaCaptureRef.current?.observeFrame(pitchFrame, now);
         const nextInput = updatePitchLaneFilter(
           filterRef.current,
           pitchFrame,
@@ -430,7 +511,7 @@ function OnboardingGame({
       ) {
         lowPitchRef.current = inputRef.current.pitchHz;
         if (inputRef.current.pitchHz !== null) {
-          onLowBaa(inputRef.current.pitchHz);
+          onLowBaaRef.current(inputRef.current.pitchHz);
         }
         stepRef.current = "high";
         setStep("high");
@@ -446,7 +527,7 @@ function OnboardingGame({
       ) {
         highPitchRef.current = inputRef.current.pitchHz;
         if (inputRef.current.pitchHz !== null) {
-          onHighBaa(inputRef.current.pitchHz);
+          onHighBaaRef.current(inputRef.current.pitchHz);
         }
         stepRef.current = "ready";
         setStep("ready");
@@ -462,7 +543,7 @@ function OnboardingGame({
           !completedRef.current
         ) {
           completedRef.current = true;
-          onComplete();
+          onCompleteRef.current();
           return;
         }
       }
@@ -471,8 +552,12 @@ function OnboardingGame({
     };
 
     animationFrame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animationFrame);
-  }, [mic, onComplete, onHighBaa, onLowBaa]);
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      capture.dispose();
+      baaCaptureRef.current = null;
+    };
+  }, [mic, onBaaSample, voicedThresholdRms]);
 
   return (
     <GameScene
@@ -483,6 +568,8 @@ function OnboardingGame({
       highBaaHz={highBaaHz}
       level={level}
       onResetBaseline={onResetBaseline}
+      baathovenSampleCount={baathovenSampleCount}
+      onPlayBaathoven={onPlayBaathoven}
       visibleLanes={step === "low" ? [0, -1] : [1, 0, -1]}
       showBarn={false}
       showItems={false}
@@ -583,6 +670,9 @@ function RunningGame({
   voicedThresholdRms,
   mic,
   level,
+  baathovenSampleCount,
+  onBaaSample,
+  onPlayBaathoven,
   onResetBaseline,
   onFinish,
 }: {
@@ -592,6 +682,9 @@ function RunningGame({
   voicedThresholdRms: number;
   mic: MicrophonePitchController;
   level: LevelDefinition;
+  baathovenSampleCount: number;
+  onBaaSample: (sample: BaaSample) => void;
+  onPlayBaathoven: () => void;
   onResetBaseline: () => void;
   onFinish: () => void;
 }) {
@@ -604,6 +697,8 @@ function RunningGame({
   const inputRef = useRef<InputState>(idleInput);
   const controlAccumulatorRef = useRef(CONTROL_TICK_MS);
   const lastTimeRef = useRef<number | null>(null);
+  const baaCaptureRef = useRef<BaaSampleCapture | null>(null);
+  const onFinishRef = useRef(onFinish);
   const finishedRef = useRef(false);
   const finishTimerRef = useRef<number | null>(null);
   const [game, setGame] = useState(gameRef.current);
@@ -611,6 +706,18 @@ function RunningGame({
   const [isCelebrating, setIsCelebrating] = useState(false);
 
   useEffect(() => {
+    onFinishRef.current = onFinish;
+  }, [onFinish]);
+
+  useEffect(() => {
+    const capture = new BaaSampleCapture(mic, {
+      voicedThresholdRms,
+      onSample: onBaaSample,
+      onRejected: (reason, summary) => {
+        console.debug("Baathoven rejected gameplay baa", { reason, summary });
+      },
+    });
+    baaCaptureRef.current = capture;
     let animationFrame = 0;
 
     const tick = (now: number) => {
@@ -624,6 +731,7 @@ function RunningGame({
         controlAccumulatorRef.current = 0;
 
         const pitchFrame = mic.samplePitch();
+        baaCaptureRef.current?.observeFrame(pitchFrame, now);
         const nextInput = updatePitchLaneFilter(
           filterRef.current,
           pitchFrame,
@@ -647,7 +755,7 @@ function RunningGame({
         finishedRef.current = true;
         setIsCelebrating(true);
         finishTimerRef.current = window.setTimeout(() => {
-          onFinish();
+          onFinishRef.current();
         }, LEVEL_FINISH_DELAY_MS);
         return;
       }
@@ -658,11 +766,13 @@ function RunningGame({
     animationFrame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(animationFrame);
+      capture.dispose();
+      baaCaptureRef.current = null;
       if (finishTimerRef.current !== null) {
         window.clearTimeout(finishTimerRef.current);
       }
     };
-  }, [level, mic, onFinish]);
+  }, [level, mic, onBaaSample, voicedThresholdRms]);
 
   return (
     <GameScene
@@ -673,6 +783,8 @@ function RunningGame({
       highBaaHz={highBaaHz}
       level={level}
       onResetBaseline={onResetBaseline}
+      baathovenSampleCount={baathovenSampleCount}
+      onPlayBaathoven={onPlayBaathoven}
       sheepBubble={
         isCelebrating ? (
           <img
@@ -695,6 +807,8 @@ function GameScene({
   highBaaHz,
   level,
   onResetBaseline,
+  baathovenSampleCount,
+  onPlayBaathoven,
   visibleLanes = [1, 0, -1],
   showBarn = true,
   showItems = true,
@@ -712,6 +826,8 @@ function GameScene({
   highBaaHz?: number | null;
   level: LevelDefinition;
   onResetBaseline?: () => void;
+  baathovenSampleCount?: number;
+  onPlayBaathoven?: () => void;
   visibleLanes?: Lane[];
   showBarn?: boolean;
   showItems?: boolean;
@@ -792,6 +908,25 @@ function GameScene({
             </div>
             <em>Reset</em>
           </button>
+          {onPlayBaathoven && (
+            <button
+              className={[
+                "baathoven-button",
+                (baathovenSampleCount ?? 0) >= MIN_SAMPLES_FOR_BAATHOVEN
+                  ? "baathoven-button-unlocked"
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              type="button"
+              onClick={onPlayBaathoven}
+              title="Play Baathoven"
+            >
+              <Music size={15} strokeWidth={3} aria-hidden="true" />
+              <span>Baathoven</span>
+              <strong>{baathovenSampleCount ?? 0}</strong>
+            </button>
+          )}
         </div>
 
         <div

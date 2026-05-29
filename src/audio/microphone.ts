@@ -110,6 +110,19 @@ export class MicrophonePitchController {
     await resumeAudioContext(this.audioContext)
   }
 
+  getAudioContext(): AudioContext {
+    return this.audioContext
+  }
+
+  createMediaRecorder(): MediaRecorder {
+    if (typeof MediaRecorder === 'undefined') {
+      throw new Error('Audio recording is not available in this browser.')
+    }
+
+    const mimeType = getPreferredRecordingMimeType()
+    return new MediaRecorder(this.stream, mimeType ? { mimeType } : undefined)
+  }
+
   samplePitch(): PitchFrame {
     this.analyser.getFloatTimeDomainData(this.buffer)
     const [pitchHz, confidence] = this.detector.findPitch(this.buffer, this.audioContext.sampleRate)
@@ -231,6 +244,17 @@ function makeAudioConstraints(supportedConstraints: MediaTrackSupportedConstrain
     ...(supportedConstraints.noiseSuppression ? { noiseSuppression: false } : {}),
     ...(supportedConstraints.autoGainControl ? { autoGainControl: false } : {}),
   }
+}
+
+function getPreferredRecordingMimeType(): string | undefined {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/mp4',
+  ]
+
+  return candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType))
 }
 
 async function resumeAudioContext(audioContext: AudioContext): Promise<void> {
