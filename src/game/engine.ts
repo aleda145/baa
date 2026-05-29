@@ -15,13 +15,13 @@ const eventMessages: Record<GameEventKind, string> = {
 }
 
 export function laneToPercent(lane: Lane | number): number {
-  if (lane >= 0.5) return 23
-  if (lane <= -0.5) return 77
+  if (lane >= 0.5) return 32
+  if (lane <= -0.5) return 68
   return 50
 }
 
 export function lanePositionToPercent(lanePosition: number): number {
-  return Math.min(77, Math.max(23, 50 - lanePosition * 27))
+  return Math.min(68, Math.max(32, 50 - lanePosition * 18))
 }
 
 export function nearestLane(value: number): Lane {

@@ -499,7 +499,7 @@ button {
 .course {
   position: relative;
   overflow: hidden;
-  height: clamp(360px, 58vh, 560px);
+  height: clamp(470px, 58vh, 560px);
   border: 4px solid rgba(42, 89, 36, 0.22);
   border-radius: 8px;
   background:
@@ -704,7 +704,8 @@ button {
   }
 
   .course {
-    height: 64vh;
+    height: min(64vh, 560px);
+    min-height: 490px;
   }
 
   .game-screen {
