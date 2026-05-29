@@ -295,6 +295,49 @@ button {
   top: 14px;
 }
 
+.level-badge {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 12;
+  display: grid;
+  justify-items: center;
+  min-width: 104px;
+  padding: 6px 9px 7px;
+  border: 1px solid rgba(56, 99, 45, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #182015;
+  box-shadow:
+    0 5px 14px rgba(42, 80, 34, 0.08),
+    inset 0 -3px 0 rgba(34, 92, 58, 0.12);
+  rotate: 1deg;
+}
+
+.level-badge span,
+.level-badge em {
+  color: #526449;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.level-badge strong {
+  margin-top: 4px;
+  color: #225c3a;
+  font-size: 17px;
+  font-weight: 1000;
+  line-height: 0.92;
+}
+
+.level-badge em {
+  margin-top: 4px;
+  color: rgba(24, 32, 21, 0.72);
+  text-transform: none;
+}
+
 .course-audio-status {
   bottom: 14px;
   align-items: flex-end;
@@ -720,6 +763,17 @@ button {
   .course-top-status,
   .course-audio-status {
     left: 10px;
+  }
+
+  .level-badge {
+    right: 10px;
+    top: 10px;
+    min-width: 88px;
+    padding: 5px 7px 6px;
+  }
+
+  .level-badge strong {
+    font-size: 14px;
   }
 
   .course-top-status {

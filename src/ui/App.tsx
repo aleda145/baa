@@ -22,6 +22,7 @@ import {
   updateGameState,
   updatePracticeGameState,
 } from "../game/engine";
+import { getLevel, type LevelDefinition } from "../game/levels";
 import type { GameState, InputState, Lane } from "../types";
 
 type Screen =
@@ -166,6 +167,7 @@ export function App() {
     micRef.current !== null &&
     measuredBaseHz !== null &&
     voicedThresholdRms !== null;
+  const activeLevel = getLevel(isRunning || screen === "results" ? 1 : 0);
 
   return (
     <main className="app-shell">
@@ -182,6 +184,7 @@ export function App() {
           highBaaHz={highBaaHz}
           voicedThresholdRms={voicedThresholdRms!}
           mic={micRef.current!}
+          level={activeLevel}
           onResetBaseline={() => {
             void calibrate(micRef.current);
           }}
@@ -197,6 +200,7 @@ export function App() {
           highBaaHz={highBaaHz}
           voicedThresholdRms={voicedThresholdRms!}
           mic={micRef.current!}
+          level={activeLevel}
           onResetBaseline={() => {
             void calibrate(micRef.current);
           }}
@@ -213,6 +217,7 @@ export function App() {
           measuredBaseHz={measuredBaseHz}
           lowBaaHz={lowBaaHz}
           highBaaHz={highBaaHz}
+          level={activeLevel}
           visibleLanes={screen === "calibrating" ? [0] : [1, 0, -1]}
           showBarn={screen !== "calibrating"}
           showItems={screen !== "calibrating"}
@@ -313,6 +318,7 @@ function OnboardingGame({
   highBaaHz,
   voicedThresholdRms,
   mic,
+  level,
   onResetBaseline,
   onComplete,
   onLowBaa,
@@ -323,6 +329,7 @@ function OnboardingGame({
   highBaaHz: number | null;
   voicedThresholdRms: number;
   mic: MicrophonePitchController;
+  level: LevelDefinition;
   onResetBaseline: () => void;
   onComplete: () => void;
   onLowBaa: (hz: number) => void;
@@ -461,6 +468,7 @@ function OnboardingGame({
       measuredBaseHz={measuredBaseHz}
       lowBaaHz={lowBaaHz}
       highBaaHz={highBaaHz}
+      level={level}
       onResetBaseline={onResetBaseline}
       visibleLanes={step === "low" ? [0, -1] : [1, 0, -1]}
       showBarn={false}
@@ -561,6 +569,7 @@ function RunningGame({
   highBaaHz,
   voicedThresholdRms,
   mic,
+  level,
   onResetBaseline,
   onFinish,
 }: {
@@ -569,6 +578,7 @@ function RunningGame({
   highBaaHz: number | null;
   voicedThresholdRms: number;
   mic: MicrophonePitchController;
+  level: LevelDefinition;
   onResetBaseline: () => void;
   onFinish: () => void;
 }) {
@@ -635,6 +645,7 @@ function RunningGame({
       measuredBaseHz={measuredBaseHz}
       lowBaaHz={lowBaaHz}
       highBaaHz={highBaaHz}
+      level={level}
       onResetBaseline={onResetBaseline}
     />
   );
@@ -646,6 +657,7 @@ function GameScene({
   measuredBaseHz,
   lowBaaHz,
   highBaaHz,
+  level,
   onResetBaseline,
   visibleLanes = [1, 0, -1],
   showBarn = true,
@@ -662,6 +674,7 @@ function GameScene({
   measuredBaseHz: number | null;
   lowBaaHz?: number | null;
   highBaaHz?: number | null;
+  level: LevelDefinition;
   onResetBaseline?: () => void;
   visibleLanes?: Lane[];
   showBarn?: boolean;
@@ -742,6 +755,12 @@ function GameScene({
             </div>
             <em>Reset</em>
           </button>
+        </div>
+
+        <div className="level-badge" aria-label={`Level ${level.id}: ${level.name}`}>
+          <span>Level {level.id}</span>
+          <strong>{level.shortName}</strong>
+          <em>{level.description}</em>
         </div>
 
         <div className="course-audio-status">
