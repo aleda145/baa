@@ -634,7 +634,7 @@ button {
 .barn {
   top: 50%;
   z-index: 3;
-  font-size: clamp(48px, 8vw, 92px);
+  width: clamp(42px, 7vw, 82px);
   filter: drop-shadow(0 10px 0 rgba(33, 68, 28, 0.18));
 }
 

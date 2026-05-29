@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Mic, Volume2 } from "lucide-react";
 import notoSheepUrl from "../assets/noto-sheep.svg";
+import notoWheatUrl from "../assets/noto-wheat.svg";
 import notoWolfUrl from "../assets/noto-wolf.svg";
 import { MicrophonePitchController } from "../audio/microphone";
 import {
@@ -155,15 +156,6 @@ export function App() {
     void requestMic();
   }, [screen]);
 
-  const retry = () => {
-    if (measuredBaseHz === null) {
-      void calibrate();
-      return;
-    }
-
-    setScreen("running");
-  };
-
   const isRunning =
     screen === "running" &&
     micRef.current !== null &&
@@ -245,33 +237,17 @@ export function App() {
         />
       )}
 
-      {!isRunning &&
-        !isOnboarding &&
-        screen !== "calibrating" &&
-        screen !== "intro" && (
+      {screen === "error" && (
         <div className="screen-overlay">
-          {screen === "results" && (
-            <SetupPanel
-              title="Barn reached"
-              eyebrow="🏠"
-              buttonLabel="Retry"
-              onPrimary={retry}
-            >
-              <p>The sheep made it home.</p>
-            </SetupPanel>
-          )}
-
-          {screen === "error" && (
-            <SetupPanel
-              title="Mic blocked"
-              eyebrow="🎙️"
-              buttonLabel="Try again"
-              onPrimary={requestMic}
-            >
-              <p>{message || "The microphone is unavailable."}</p>
-              <p>Use localhost or HTTPS and allow microphone access.</p>
-            </SetupPanel>
-          )}
+          <SetupPanel
+            title="Mic blocked"
+            eyebrow="🎙️"
+            buttonLabel="Try again"
+            onPrimary={requestMic}
+          >
+            <p>{message || "The microphone is unavailable."}</p>
+            <p>Use localhost or HTTPS and allow microphone access.</p>
+          </SetupPanel>
         </div>
       )}
 
@@ -841,8 +817,8 @@ function GameScene({
         ))}
 
         {showBarn && (
-          <div className="barn" style={{ left: `${barnX}%` }} aria-label="barn">
-            🏠
+          <div className="barn" style={{ left: `${barnX}%` }} aria-label="wheat">
+            <img className="emoji-asset" src={notoWheatUrl} alt="" draggable={false} />
           </div>
         )}
 
