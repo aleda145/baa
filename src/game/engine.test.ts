@@ -13,7 +13,10 @@ import {
   updateGameState,
   updatePracticeGameState,
 } from './engine'
+import { getLevel } from './levels'
 import type { GameState, Lane } from '../types'
+
+const levelOne = getLevel(1)
 
 function stateAtWolf(lane: Lane = 0): GameState {
   const state = createInitialGameState()
@@ -58,7 +61,7 @@ describe('runner engine', () => {
 
   it('moves the sheep toward the requested target lane', () => {
     const state = createInitialGameState()
-    const next = updateGameState(state, 1, 100)
+    const next = updateGameState(state, 1, 100, levelOne)
 
     expect(next.sheep.targetLane).toBe(1)
     expect(next.sheep.lanePosition).toBeGreaterThan(0)
@@ -84,7 +87,7 @@ describe('runner engine', () => {
     state.sheep.lane = 0
     state.sheep.lanePosition = 0
 
-    const next = updateGameState(state, 0, 16)
+    const next = updateGameState(state, 0, 16, levelOne)
 
     expect(next.items[0].collectedOrHit).toBe(false)
     expect(next.finished).toBe(false)
@@ -102,7 +105,7 @@ describe('runner engine', () => {
   })
 
   it('resets to the start when the sheep hits a wolf', () => {
-    const next = updateGameState(stateAtWolf(), 0, 16)
+    const next = updateGameState(stateAtWolf(), 0, 16, levelOne)
 
     expect(next.finished).toBe(false)
     expect(next.outcome).toBe('running')
@@ -115,9 +118,12 @@ describe('runner engine', () => {
   it('wins when the sheep reaches the barn', () => {
     const state = createInitialGameState()
     state.progress = COURSE_LENGTH - 1
+    state.sheep.lane = 1
+    state.sheep.lanePosition = 1
+    state.sheep.targetLane = 1
     state.items = []
 
-    const next = updateGameState(state, 0, 1000)
+    const next = updateGameState(state, 1, 1000, levelOne)
 
     expect(next.finished).toBe(true)
     expect(next.outcome).toBe('won')
@@ -128,17 +134,17 @@ describe('runner engine', () => {
   it('loops when the sheep reaches the end outside the barn lane', () => {
     const state = createInitialGameState()
     state.progress = COURSE_LENGTH - 1
-    state.sheep.lane = 1
-    state.sheep.lanePosition = 1
-    state.sheep.targetLane = 1
+    state.sheep.lane = 0
+    state.sheep.lanePosition = 0
+    state.sheep.targetLane = 0
     state.items = state.items.map((item) => ({ ...item, missed: true }))
 
-    const next = updateGameState(state, 1, 1000)
+    const next = updateGameState(state, 0, 1000, levelOne)
 
     expect(next.finished).toBe(false)
     expect(next.outcome).toBe('running')
     expect(next.progress).toBeLessThan(COURSE_LENGTH)
-    expect(next.sheep.lane).toBe(1)
+    expect(next.sheep.lane).toBe(0)
     expect(next.items.every((item) => !item.missed)).toBe(true)
   })
 })

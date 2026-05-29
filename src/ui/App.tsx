@@ -620,6 +620,7 @@ function RunningGame({
         gameRef.current,
         inputRef.current.lane,
         dtMs,
+        level,
       );
 
       gameRef.current = nextGame;
@@ -692,6 +693,7 @@ function GameScene({
   const courseItems = showItems ? getCourseItems(game) : [];
   const sheepX = distanceToScreenX(game.progress);
   const barnX = distanceToScreenX(COURSE_LENGTH);
+  const wheatTop = laneToPercent(level.finishLane);
   const sheepClass = [
     "sheep",
     game.sheep.tumbleMs > 0 ? "sheep-tumble" : "",
@@ -836,7 +838,11 @@ function GameScene({
         ))}
 
         {showBarn && (
-          <div className="barn" style={{ left: `${barnX}%` }} aria-label="wheat">
+          <div
+            className="barn"
+            style={{ left: `${barnX}%`, top: `${wheatTop}%` }}
+            aria-label="wheat"
+          >
             <img className="emoji-asset" src={notoWheatUrl} alt="" draggable={false} />
           </div>
         )}

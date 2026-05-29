@@ -1,4 +1,5 @@
 import type { GameEvent, GameEventKind, GameItem, GameState, Lane } from '../types'
+import type { LevelDefinition } from './levels'
 
 export const COURSE_LENGTH = 3000
 export const COURSE_START_X = 7
@@ -6,7 +7,6 @@ export const COURSE_END_X = 93
 export const BASE_SPEED = 600
 export const HIT_WINDOW = 24
 export const LANE_EASE_MS = 210
-export const BARN_LANE: Lane = 0
 
 const laneOrder: Lane[] = [1, 0, -1]
 
@@ -116,7 +116,12 @@ export function updatePracticeGameState(state: GameState, targetLane: Lane, dtMs
   return next
 }
 
-export function updateGameState(state: GameState, targetLane: Lane, dtMs: number): GameState {
+export function updateGameState(
+  state: GameState,
+  targetLane: Lane,
+  dtMs: number,
+  level: LevelDefinition,
+): GameState {
   if (state.finished) return state
 
   const next: GameState = {
@@ -163,7 +168,7 @@ export function updateGameState(state: GameState, targetLane: Lane, dtMs: number
   }
 
   if (next.progress >= COURSE_LENGTH) {
-    if (next.sheep.lane === BARN_LANE) {
+    if (next.sheep.lane === level.finishLane) {
       next.finished = true
       next.outcome = 'won'
       next.finishTimeMs = next.elapsedMs
