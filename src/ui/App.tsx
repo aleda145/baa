@@ -5,9 +5,8 @@ import notoSheepUrl from "../assets/noto-sheep.svg";
 import notoWheatUrl from "../assets/noto-wheat.svg";
 import notoWolfUrl from "../assets/noto-wolf.svg";
 import {
-  BaaSampleBank,
-  BaaSampleCapture,
   MIN_SAMPLES_FOR_BAATHOVEN,
+  createCalibrationBaaSample,
   logBaathovenStats,
   playBaathoven,
   type BaaSample,
@@ -100,7 +99,6 @@ export function App() {
   const [message, setMessage] = useState("");
   const retryTimerRef = useRef<number | null>(null);
   const autoMicStartedRef = useRef(false);
-  const baaSampleBankRef = useRef(new BaaSampleBank());
   const [baaSamples, setBaaSamples] = useState<BaaSample[]>([]);
 
   useEffect(() => {
@@ -132,31 +130,14 @@ export function App() {
     }
   };
 
-  const onBaaSample = useCallback((sample: BaaSample) => {
-    const samples = baaSampleBankRef.current.add(sample);
-    setBaaSamples(samples);
-    console.log("Baathoven accepted baa sample", {
-      id: sample.id,
-      pitchHz: Math.round(sample.basePitchHz),
-      midiNote: sample.midiNote,
-      durationMs: Math.round(sample.durationMs),
-      confidence: Number(sample.confidence.toFixed(3)),
-      rms: Number(sample.rms.toFixed(4)),
-      sampleCount: samples.length,
-      unlocked: samples.length >= MIN_SAMPLES_FOR_BAATHOVEN,
-    });
-    logBaathovenStats(samples);
-  }, []);
-
   const playCollectedBaathoven = useCallback(async () => {
     const mic = micRef.current;
-    const samples = baaSampleBankRef.current.list();
 
     console.log("Baathoven button pressed", {
-      sampleCount: samples.length,
+      sampleCount: baaSamples.length,
       screen,
     });
-    logBaathovenStats(samples);
+    logBaathovenStats(baaSamples);
 
     if (!mic) {
       console.warn("Baathoven cannot play before microphone setup.");
@@ -165,11 +146,11 @@ export function App() {
 
     try {
       await mic.resume();
-      await playBaathoven(mic.getAudioContext(), samples);
+      await playBaathoven(mic.getAudioContext(), baaSamples);
     } catch (error) {
       console.warn("Baathoven playback failed", error);
     }
-  }, [screen]);
+  }, [baaSamples, screen]);
 
   const learnNoise = async (mic = micRef.current) => {
     if (!mic) return;
@@ -219,6 +200,36 @@ export function App() {
     setCalibrationProgress(1);
     setMeasuredBaseHz(calibration.measuredBaseHz);
     setVoicedThresholdRms(calibration.voicedThresholdRms);
+
+    if (calibration.audioBuffer) {
+      const sample = createCalibrationBaaSample(
+        mic.getAudioContext(),
+        mic.getNoiseReducer(),
+        {
+          audioBuffer: calibration.audioBuffer,
+          blob: calibration.blob,
+          basePitchHz: calibration.measuredBaseHz,
+          rms: calibration.baaahRms,
+          confidence: calibration.confidence,
+          voicedThresholdRms: calibration.voicedThresholdRms,
+        },
+      );
+      const samples = [sample];
+      setBaaSamples(samples);
+      console.log("Baathoven calibration baa sample", {
+        id: sample.id,
+        pitchHz: Math.round(sample.basePitchHz),
+        midiNote: sample.midiNote,
+        durationMs: Math.round(sample.durationMs),
+        confidence: Number(sample.confidence.toFixed(3)),
+        rms: Number(sample.rms.toFixed(4)),
+      });
+      logBaathovenStats(samples);
+    } else {
+      setBaaSamples([]);
+      console.warn("Baathoven calibration baa sample was not recorded.");
+    }
+
     setScreen("onboarding");
   };
 
@@ -262,7 +273,6 @@ export function App() {
           mic={micRef.current!}
           level={activeLevel}
           baathovenSampleCount={baaSamples.length}
-          onBaaSample={onBaaSample}
           onPlayBaathoven={playCollectedBaathoven}
           onResetBaseline={() => {
             void calibrate(micRef.current);
@@ -287,7 +297,6 @@ export function App() {
           mic={micRef.current!}
           level={activeLevel}
           baathovenSampleCount={baaSamples.length}
-          onBaaSample={onBaaSample}
           onPlayBaathoven={playCollectedBaathoven}
           onResetBaseline={() => {
             void calibrate(micRef.current);
@@ -435,7 +444,6 @@ function OnboardingGame({
   mic,
   level,
   baathovenSampleCount,
-  onBaaSample,
   onPlayBaathoven,
   onResetBaseline,
   onComplete,
@@ -449,7 +457,6 @@ function OnboardingGame({
   mic: MicrophonePitchController;
   level: LevelDefinition;
   baathovenSampleCount: number;
-  onBaaSample: (sample: BaaSample) => void;
   onPlayBaathoven: () => void;
   onResetBaseline: () => void;
   onComplete: () => void;
@@ -466,7 +473,6 @@ function OnboardingGame({
   const stepStartedAtRef = useRef(0);
   const lowPitchRef = useRef<number | null>(null);
   const highPitchRef = useRef<number | null>(null);
-  const baaCaptureRef = useRef<BaaSampleCapture | null>(null);
   const onCompleteRef = useRef(onComplete);
   const onLowBaaRef = useRef(onLowBaa);
   const onHighBaaRef = useRef(onHighBaa);
@@ -487,14 +493,6 @@ function OnboardingGame({
   }, [onComplete, onHighBaa, onLowBaa]);
 
   useEffect(() => {
-    const capture = new BaaSampleCapture(mic, {
-      voicedThresholdRms,
-      onSample: onBaaSample,
-      onRejected: (reason, summary) => {
-        console.debug("Baathoven rejected onboarding baa", { reason, summary });
-      },
-    });
-    baaCaptureRef.current = capture;
     let animationFrame = 0;
 
     const tick = (now: number) => {
@@ -512,7 +510,6 @@ function OnboardingGame({
         controlAccumulatorRef.current = 0;
 
         const pitchFrame = mic.samplePitch();
-        baaCaptureRef.current?.observeFrame(pitchFrame, now);
         const nextInput = updatePitchLaneFilter(
           filterRef.current,
           pitchFrame,
@@ -600,10 +597,8 @@ function OnboardingGame({
     animationFrame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(animationFrame);
-      capture.dispose();
-      baaCaptureRef.current = null;
     };
-  }, [mic, onBaaSample, voicedThresholdRms]);
+  }, [mic, voicedThresholdRms]);
 
   return (
     <GameScene
@@ -717,7 +712,6 @@ function RunningGame({
   mic,
   level,
   baathovenSampleCount,
-  onBaaSample,
   onPlayBaathoven,
   onResetBaseline,
   onFinish,
@@ -729,7 +723,6 @@ function RunningGame({
   mic: MicrophonePitchController;
   level: LevelDefinition;
   baathovenSampleCount: number;
-  onBaaSample: (sample: BaaSample) => void;
   onPlayBaathoven: () => void;
   onResetBaseline: () => void;
   onFinish: () => void;
@@ -743,7 +736,6 @@ function RunningGame({
   const inputRef = useRef<InputState>(idleInput);
   const controlAccumulatorRef = useRef(CONTROL_TICK_MS);
   const lastTimeRef = useRef<number | null>(null);
-  const baaCaptureRef = useRef<BaaSampleCapture | null>(null);
   const onFinishRef = useRef(onFinish);
   const finishedRef = useRef(false);
   const finishTimerRef = useRef<number | null>(null);
@@ -756,14 +748,6 @@ function RunningGame({
   }, [onFinish]);
 
   useEffect(() => {
-    const capture = new BaaSampleCapture(mic, {
-      voicedThresholdRms,
-      onSample: onBaaSample,
-      onRejected: (reason, summary) => {
-        console.debug("Baathoven rejected gameplay baa", { reason, summary });
-      },
-    });
-    baaCaptureRef.current = capture;
     let animationFrame = 0;
 
     const tick = (now: number) => {
@@ -777,7 +761,6 @@ function RunningGame({
         controlAccumulatorRef.current = 0;
 
         const pitchFrame = mic.samplePitch();
-        baaCaptureRef.current?.observeFrame(pitchFrame, now);
         const nextInput = updatePitchLaneFilter(
           filterRef.current,
           pitchFrame,
@@ -812,13 +795,11 @@ function RunningGame({
     animationFrame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(animationFrame);
-      capture.dispose();
-      baaCaptureRef.current = null;
       if (finishTimerRef.current !== null) {
         window.clearTimeout(finishTimerRef.current);
       }
     };
-  }, [level, mic, onBaaSample, voicedThresholdRms]);
+  }, [level, mic, voicedThresholdRms]);
 
   return (
     <GameScene

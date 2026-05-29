@@ -15,6 +15,8 @@ type FerriteNoiseReducerInstance = {
 };
 
 const FERRITE_WASM_URL = "/wasm/wasm_audio_ferrite_bg.wasm";
+const LIVE_DENOISE_AMOUNT = 1;
+const SAMPLE_DENOISE_WET_MIX = 1;
 
 let ferriteModulePromise: Promise<FerriteNoiseReducerModule> | null = null;
 
@@ -31,7 +33,7 @@ export class FerriteNoiseReducer {
     reducer.set_spectral_enabled?.(true);
     reducer.set_gate_enabled?.(false);
     reducer.set_wiener_filter_mode?.(true);
-    reducer.set_reduction_amount?.(0.82);
+    reducer.set_reduction_amount?.(LIVE_DENOISE_AMOUNT);
 
     return new FerriteNoiseReducer(reducer);
   }
@@ -69,7 +71,8 @@ export class FerriteNoiseReducer {
 
     for (let channel = 0; channel < inputBuffer.numberOfChannels; channel += 1) {
       const input = inputBuffer.getChannelData(channel);
-      const output = this.processFrame(input);
+      const denoised = this.processFrame(input);
+      const output = blendSignals(input, denoised, SAMPLE_DENOISE_WET_MIX);
       outputBuffer.copyToChannel(new Float32Array(output), channel);
     }
 
@@ -79,6 +82,21 @@ export class FerriteNoiseReducer {
   dispose(): void {
     this.reducer.free?.();
   }
+}
+
+function blendSignals(
+  dry: Float32Array,
+  wet: Float32Array,
+  wetMix: number,
+): Float32Array {
+  const output = new Float32Array(dry.length);
+  const dryMix = 1 - wetMix;
+
+  for (let index = 0; index < output.length; index += 1) {
+    output[index] = dry[index] * dryMix + (wet[index] ?? 0) * wetMix;
+  }
+
+  return output;
 }
 
 async function loadFerriteModule(): Promise<FerriteNoiseReducerModule> {

@@ -10,6 +10,8 @@ import { FerriteNoiseReducer } from './ferriteNoise'
 const FFT_SIZE = 2048
 const CALIBRATION_HOLD_MS = 500
 const CALIBRATION_TIMEOUT_MS = 9000
+const CALIBRATION_SAMPLE_PREROLL_MS = 200
+const CALIBRATION_SAMPLE_TAIL_MS = 220
 const MIN_VOICED_THRESHOLD_RMS = 0.003
 const MAX_VOICED_THRESHOLD_RMS = 0.03
 
@@ -31,6 +33,24 @@ export type CalibrationResult = {
   voicedThresholdRms: number
   noiseFloorRms: number
   baaahRms: number
+  confidence: number
+  audioBuffer?: AudioBuffer
+  blob?: Blob
+}
+
+type RecordedAudio = {
+  audioBuffer: AudioBuffer
+  blob: Blob
+}
+
+type ActiveRecording = {
+  recorder: MediaRecorder
+  chunks: Blob[]
+}
+
+type AudioCrop = {
+  startMs: number
+  endMs: number
 }
 
 type AudioContextConstructor = typeof AudioContext
@@ -235,13 +255,39 @@ export class MicrophonePitchController {
 
     return new Promise((resolve) => {
       const startedAt = performance.now()
+      const recording = this.startRecording()
+      let settled = false
       let lastTickAt = startedAt
       let heldMs = 0
       let pitches: number[] = []
       const noiseRmsSamples: number[] = []
       let baaahRmsSamples: number[] = []
+      let confidenceSamples: number[] = []
+      let baaahStartedAt: number | null = null
+
+      const finish = async (
+        result: Omit<CalibrationResult, 'audioBuffer' | 'blob'> | null,
+        crop?: AudioCrop,
+      ) => {
+        if (settled) return
+        settled = true
+
+        if (result !== null) {
+          await sleep(CALIBRATION_SAMPLE_TAIL_MS)
+        }
+
+        const recordedAudio = await this.stopRecording(recording, crop)
+        if (result === null) {
+          resolve(null)
+          return
+        }
+
+        resolve(recordedAudio === null ? result : { ...result, ...recordedAudio })
+      }
 
       const tick = () => {
+        if (settled) return
+
         const now = performance.now()
         const dtMs = now - lastTickAt
         lastTickAt = now
@@ -250,13 +296,19 @@ export class MicrophonePitchController {
         const validBaaahPitch = frame.pitchHz
 
         if (validBaaahPitch) {
+          if (heldMs === 0) {
+            baaahStartedAt = now
+          }
           heldMs += dtMs
           pitches.push(validBaaahPitch)
           baaahRmsSamples.push(frame.rms)
+          confidenceSamples.push(frame.confidence)
         } else {
           heldMs = 0
           pitches = []
           baaahRmsSamples = []
+          confidenceSamples = []
+          baaahStartedAt = null
           noiseRmsSamples.push(frame.rms)
         }
 
@@ -265,17 +317,28 @@ export class MicrophonePitchController {
         if (heldMs >= holdMs) {
           const noiseFloorRms = percentile(noiseRmsSamples, 0.5)
           const baaahRms = median(baaahRmsSamples)
-          resolve({
-            measuredBaseHz: median(pitches),
-            voicedThresholdRms: calculateVoicedThresholdRms(noiseFloorRms, baaahRms),
-            noiseFloorRms,
-            baaahRms,
-          })
+          const cropStartMs = Math.max(
+            0,
+            (baaahStartedAt ?? now) - startedAt - CALIBRATION_SAMPLE_PREROLL_MS,
+          )
+          void finish(
+            {
+              measuredBaseHz: median(pitches),
+              voicedThresholdRms: calculateVoicedThresholdRms(noiseFloorRms, baaahRms),
+              noiseFloorRms,
+              baaahRms,
+              confidence: median(confidenceSamples),
+            },
+            {
+              startMs: cropStartMs,
+              endMs: now - startedAt + CALIBRATION_SAMPLE_TAIL_MS,
+            },
+          )
           return
         }
 
         if (now - startedAt >= timeoutMs) {
-          resolve(null)
+          void finish(null)
           return
         }
 
@@ -284,6 +347,76 @@ export class MicrophonePitchController {
 
       tick()
     })
+  }
+
+  private startRecording(): ActiveRecording | null {
+    try {
+      const recorder = this.createMediaRecorder()
+      const chunks: Blob[] = []
+
+      recorder.addEventListener('dataavailable', (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data)
+        }
+      })
+
+      recorder.start(100)
+      return { recorder, chunks }
+    } catch (error) {
+      console.warn('Calibration baa recording could not start', error)
+      return null
+    }
+  }
+
+  private async stopRecording(
+    recording: ActiveRecording | null,
+    crop?: AudioCrop,
+  ): Promise<RecordedAudio | null> {
+    if (recording === null) return null
+
+    const { recorder, chunks } = recording
+
+    return new Promise((resolve) => {
+      recorder.addEventListener(
+        'stop',
+        () => {
+          void this.decodeRecording(chunks, recorder.mimeType, crop).then(resolve)
+        },
+        { once: true },
+      )
+
+      try {
+        if (recorder.state !== 'inactive') {
+          recorder.requestData()
+          recorder.stop()
+        } else {
+          void this.decodeRecording(chunks, recorder.mimeType, crop).then(resolve)
+        }
+      } catch (error) {
+        console.warn('Calibration baa recording could not stop', error)
+        resolve(null)
+      }
+    })
+  }
+
+  private async decodeRecording(
+    chunks: Blob[],
+    mimeType: string,
+    crop?: AudioCrop,
+  ): Promise<RecordedAudio | null> {
+    const blob = new Blob(chunks, { type: mimeType || 'audio/webm' })
+    if (blob.size === 0) return null
+
+    try {
+      const decoded = await this.audioContext.decodeAudioData(await blob.arrayBuffer())
+      return {
+        blob,
+        audioBuffer: crop ? cropAudioBuffer(this.audioContext, decoded, crop) : decoded,
+      }
+    } catch (error) {
+      console.warn('Calibration baa recording could not decode', error)
+      return null
+    }
   }
 
   async close(): Promise<void> {
@@ -339,6 +472,40 @@ function mergeChunks(chunks: Float32Array[], totalLength: number): Float32Array 
   }
 
   return merged
+}
+
+function cropAudioBuffer(
+  audioContext: AudioContext,
+  audioBuffer: AudioBuffer,
+  crop: AudioCrop,
+): AudioBuffer {
+  const startFrame = Math.max(
+    0,
+    Math.floor((crop.startMs / 1000) * audioBuffer.sampleRate),
+  )
+  const endFrame = Math.min(
+    audioBuffer.length,
+    Math.ceil((crop.endMs / 1000) * audioBuffer.sampleRate),
+  )
+  const length = Math.max(1, endFrame - startFrame)
+  const cropped = audioContext.createBuffer(
+    audioBuffer.numberOfChannels,
+    length,
+    audioBuffer.sampleRate,
+  )
+
+  for (let channel = 0; channel < audioBuffer.numberOfChannels; channel += 1) {
+    cropped.copyToChannel(
+      audioBuffer.getChannelData(channel).subarray(startFrame, endFrame),
+      channel,
+    )
+  }
+
+  return cropped
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
 }
 
 async function resumeAudioContext(audioContext: AudioContext): Promise<void> {
