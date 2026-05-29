@@ -6,7 +6,7 @@ export type LevelDefinition = {
   shortName: string;
   description: string;
   finishLane: Lane;
-}
+};
 
 export const levels: LevelDefinition[] = [
   {

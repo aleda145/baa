@@ -75,7 +75,7 @@ function inputFromPitchFrame(frame: PitchFrame): InputState {
 
 export function App() {
   const micRef = useRef<MicrophonePitchController | null>(null);
-  const previewGameRef = useRef<GameState>(createInitialGameState());
+  const previewGameRef = useRef<GameState>(createPracticeGameState());
   const [screen, setScreen] = useState<Screen>("intro");
   const [measuredBaseHz, setMeasuredBaseHz] = useState<number | null>(null);
   const [lowBaaHz, setLowBaaHz] = useState<number | null>(null);
@@ -218,9 +218,9 @@ export function App() {
           lowBaaHz={lowBaaHz}
           highBaaHz={highBaaHz}
           level={activeLevel}
-          visibleLanes={screen === "calibrating" ? [0] : [1, 0, -1]}
-          showBarn={screen !== "calibrating"}
-          showItems={screen !== "calibrating"}
+          visibleLanes={screen === "intro" || screen === "calibrating" ? [0] : [1, 0, -1]}
+          showBarn={screen !== "intro" && screen !== "calibrating"}
+          showItems={screen !== "intro" && screen !== "calibrating"}
           prompt={
             screen === "intro"
               ? "Use microphone"
