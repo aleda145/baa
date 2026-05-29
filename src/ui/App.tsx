@@ -36,6 +36,7 @@ import type { GameState, InputState, Lane } from "../types";
 
 type Screen =
   | "intro"
+  | "learning-noise"
   | "calibrating"
   | "onboarding"
   | "running"
@@ -119,6 +120,7 @@ export function App() {
     try {
       const mic = await MicrophonePitchController.create();
       micRef.current = mic;
+      await learnNoise(mic);
       await calibrate(mic);
     } catch (error) {
       setMessage(
@@ -168,6 +170,26 @@ export function App() {
       console.warn("Baathoven playback failed", error);
     }
   }, [screen]);
+
+  const learnNoise = async (mic = micRef.current) => {
+    if (!mic) return;
+
+    setMessage("Stay quiet");
+    setCalibrationProgress(0);
+    setSetupInput(idleInput);
+    setScreen("learning-noise");
+
+    const learnedNoise = await mic.learnNoiseProfile({
+      onProgress: setCalibrationProgress,
+      onFrame: (frame) => {
+        setSetupInput(inputFromPitchFrame(frame));
+      },
+    });
+
+    console.log("Ferrite quiet-room intro complete", { learnedNoise });
+    setCalibrationProgress(1);
+    setMessage("");
+  };
 
   const calibrate = async (mic = micRef.current) => {
     if (!mic) return;
@@ -286,19 +308,43 @@ export function App() {
           highBaaHz={highBaaHz}
           level={activeLevel}
           visibleLanes={
-            screen === "intro" || screen === "calibrating" ? [0] : [1, 0, -1]
+            screen === "intro" ||
+            screen === "learning-noise" ||
+            screen === "calibrating"
+              ? [0]
+              : [1, 0, -1]
           }
-          showBarn={screen !== "intro" && screen !== "calibrating"}
-          showItems={screen !== "intro" && screen !== "calibrating"}
+          showBarn={
+            screen !== "intro" &&
+            screen !== "learning-noise" &&
+            screen !== "calibrating"
+          }
+          showItems={
+            screen !== "intro" &&
+            screen !== "learning-noise" &&
+            screen !== "calibrating"
+          }
           prompt={
             screen === "intro"
               ? "Use microphone"
+              : screen === "learning-noise"
+                ? "Stay quiet"
               : screen === "calibrating"
                 ? "Say baaah"
                 : ""
           }
-          promptHint={screen === "calibrating" ? message : ""}
-          promptProgress={screen === "calibrating" ? calibrationProgress : null}
+          promptHint={
+            screen === "learning-noise"
+              ? "Learning room noise"
+              : screen === "calibrating"
+                ? message
+                : ""
+          }
+          promptProgress={
+            screen === "learning-noise" || screen === "calibrating"
+              ? calibrationProgress
+              : null
+          }
           promptAction={screen === "intro" ? requestMic : undefined}
           sheepBubble={
             screen === "intro" ? (

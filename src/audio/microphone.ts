@@ -5,6 +5,7 @@ import {
   MIN_PITCH_HZ,
   type PitchFrame,
 } from './pitchLane'
+import { FerriteNoiseReducer } from './ferriteNoise'
 
 const FFT_SIZE = 2048
 const CALIBRATION_HOLD_MS = 500
@@ -15,6 +16,12 @@ const MAX_VOICED_THRESHOLD_RMS = 0.03
 type CalibrationOptions = {
   holdMs?: number
   timeoutMs?: number
+  onProgress?: (progress: number) => void
+  onFrame?: (frame: PitchFrame) => void
+}
+
+type NoiseLearningOptions = {
+  durationMs?: number
   onProgress?: (progress: number) => void
   onFrame?: (frame: PitchFrame) => void
 }
@@ -50,6 +57,8 @@ export function calculateVoicedThresholdRms(noiseFloorRms: number, baaahRms: num
 }
 
 export class MicrophonePitchController {
+  private noiseReducer: FerriteNoiseReducer | null = null
+
   private constructor(
     private readonly stream: MediaStream,
     private readonly audioContext: AudioContext,
@@ -123,13 +132,74 @@ export class MicrophonePitchController {
     return new MediaRecorder(this.stream, mimeType ? { mimeType } : undefined)
   }
 
+  getNoiseReducer(): FerriteNoiseReducer | null {
+    return this.noiseReducer
+  }
+
+  async learnNoiseProfile({
+    durationMs = 1200,
+    onProgress,
+    onFrame,
+  }: NoiseLearningOptions = {}): Promise<boolean> {
+    await resumeAudioContext(this.audioContext)
+
+    try {
+      this.noiseReducer?.dispose()
+      this.noiseReducer = await FerriteNoiseReducer.create(this.audioContext.sampleRate)
+    } catch (error) {
+      console.warn('Ferrite noise reduction could not initialize', error)
+      return false
+    }
+
+    const startedAt = performance.now()
+    const chunks: Float32Array[] = []
+    let totalLength = 0
+
+    return new Promise((resolve) => {
+      const tick = () => {
+        this.analyser.getFloatTimeDomainData(this.buffer)
+        const chunk = new Float32Array(this.buffer)
+        chunks.push(chunk)
+        totalLength += chunk.length
+
+        const [pitchHz, confidence] = this.detector.findPitch(this.buffer, this.audioContext.sampleRate)
+        const rawPitchHz = Number.isFinite(pitchHz) ? pitchHz : null
+        const rawConfidence = Number.isFinite(confidence) ? confidence : 0
+        onFrame?.({
+          pitchHz: null,
+          rawPitchHz,
+          confidence: rawConfidence,
+          rawConfidence,
+          pitchStatus: getPitchStatus(rawPitchHz, rawConfidence),
+          volume: calculateVolumeLevel(this.buffer),
+          rms: calculateRms(this.buffer),
+        })
+
+        const elapsedMs = performance.now() - startedAt
+        onProgress?.(Math.min(1, elapsedMs / durationMs))
+
+        if (elapsedMs >= durationMs) {
+          const noiseSamples = mergeChunks(chunks, totalLength)
+          this.noiseReducer?.learnNoise(noiseSamples)
+          resolve(true)
+          return
+        }
+
+        requestAnimationFrame(tick)
+      }
+
+      tick()
+    })
+  }
+
   samplePitch(): PitchFrame {
     this.analyser.getFloatTimeDomainData(this.buffer)
-    const [pitchHz, confidence] = this.detector.findPitch(this.buffer, this.audioContext.sampleRate)
+    const analysisBuffer = this.noiseReducer?.processFrame(this.buffer) ?? this.buffer
+    const [pitchHz, confidence] = this.detector.findPitch(analysisBuffer, this.audioContext.sampleRate)
     const rawPitchHz = Number.isFinite(pitchHz) ? pitchHz : null
     const rawConfidence = Number.isFinite(confidence) ? confidence : 0
-    const rms = calculateRms(this.buffer)
-    const volume = calculateVolumeLevel(this.buffer)
+    const rms = calculateRms(analysisBuffer)
+    const volume = calculateVolumeLevel(analysisBuffer)
     const pitchStatus = getPitchStatus(rawPitchHz, rawConfidence)
 
     if (pitchStatus !== 'ok') {
@@ -221,6 +291,8 @@ export class MicrophonePitchController {
     this.analyser.disconnect()
     this.silentOutput.disconnect()
     this.stream.getTracks().forEach((track) => track.stop())
+    this.noiseReducer?.dispose()
+    this.noiseReducer = null
     if (this.audioContext.state !== 'closed') {
       await this.audioContext.close()
     }
@@ -255,6 +327,18 @@ function getPreferredRecordingMimeType(): string | undefined {
   ]
 
   return candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType))
+}
+
+function mergeChunks(chunks: Float32Array[], totalLength: number): Float32Array {
+  const merged = new Float32Array(totalLength)
+  let offset = 0
+
+  for (const chunk of chunks) {
+    merged.set(chunk, offset)
+    offset += chunk.length
+  }
+
+  return merged
 }
 
 async function resumeAudioContext(audioContext: AudioContext): Promise<void> {

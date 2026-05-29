@@ -1,4 +1,5 @@
 import { MicrophonePitchController } from "./microphone";
+import type { FerriteNoiseReducer } from "./ferriteNoise";
 import {
   MAX_PITCH_HZ,
   MIN_CONFIDENCE,
@@ -207,6 +208,7 @@ export class BaaSampleCapture {
     try {
       const sample = await buildBaaSample(
         this.mic.getAudioContext(),
+        this.mic.getNoiseReducer(),
         capture,
         endedAt,
         this.options.voicedThresholdRms,
@@ -369,6 +371,7 @@ function isValidPitchFrame(frame: PitchFrame): boolean {
 
 async function buildBaaSample(
   audioContext: AudioContext,
+  noiseReducer: FerriteNoiseReducer | null,
   capture: ActiveCapture,
   endedAt: number,
   voicedThresholdRms: number,
@@ -395,7 +398,8 @@ async function buildBaaSample(
   }
 
   const decoded = await audioContext.decodeAudioData(await blob.arrayBuffer());
-  const audioBuffer = trimAudioBuffer(audioContext, decoded, voicedThresholdRms);
+  const denoised = noiseReducer?.processAudioBuffer(audioContext, decoded) ?? decoded;
+  const audioBuffer = trimAudioBuffer(audioContext, denoised, voicedThresholdRms);
   const durationMs = audioBuffer.duration * 1000;
 
   if (durationMs < MIN_BAA_DURATION_MS) {
