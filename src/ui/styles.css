@@ -137,11 +137,70 @@ button {
   position: relative;
   width: min(1100px, 100%);
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .game-screen-preview {
   filter: saturate(0.9);
+}
+
+.page-title {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  z-index: 5;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: min(420px, calc(100% - 32px));
+  transform: translateX(-50%);
+  color: #182015;
+  text-align: center;
+  pointer-events: none;
+}
+
+.page-title h1 {
+  margin: 0;
+  color: #225c3a;
+  font-size: clamp(46px, 8vw, 84px);
+  font-weight: 1000;
+  line-height: 0.85;
+  letter-spacing: 0;
+  text-shadow: 0 5px 0 rgba(24, 32, 21, 0.12);
+}
+
+.page-title p {
+  margin: 0;
+  color: #526449;
+  font-size: clamp(15px, 2.2vw, 20px);
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.page-footer {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  z-index: 6;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  width: min(520px, calc(100% - 24px));
+  transform: translateX(-50%);
+  color: rgba(24, 32, 21, 0.72);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.page-footer a {
+  color: #225c3a;
+  text-decoration: none;
+}
+
+.page-footer a:hover {
+  text-decoration: underline;
 }
 
 .voice-control {
