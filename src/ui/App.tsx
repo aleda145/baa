@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Volume2 } from "lucide-react";
+import { Mic, Volume2 } from "lucide-react";
 import notoSheepUrl from "../assets/noto-sheep.svg";
 import notoWolfUrl from "../assets/noto-wolf.svg";
 import { MicrophonePitchController } from "../audio/microphone";
@@ -83,6 +83,7 @@ export function App() {
   const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [message, setMessage] = useState("");
   const retryTimerRef = useRef<number | null>(null);
+  const autoMicStartedRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -138,6 +139,15 @@ export function App() {
     setVoicedThresholdRms(calibration.voicedThresholdRms);
     setScreen("onboarding");
   };
+
+  useEffect(() => {
+    if (screen !== "intro" || autoMicStartedRef.current || micRef.current) {
+      return;
+    }
+
+    autoMicStartedRef.current = true;
+    void requestMic();
+  }, [screen]);
 
   const retry = () => {
     if (measuredBaseHz === null) {
@@ -200,33 +210,32 @@ export function App() {
           visibleLanes={screen === "calibrating" ? [0] : [1, 0, -1]}
           showBarn={screen !== "calibrating"}
           showItems={screen !== "calibrating"}
-          prompt={screen === "calibrating" ? "Say baaah" : ""}
+          prompt={
+            screen === "intro"
+              ? "Use microphone"
+              : screen === "calibrating"
+                ? "Say baaah"
+                : ""
+          }
           promptHint={screen === "calibrating" ? message : ""}
           promptProgress={screen === "calibrating" ? calibrationProgress : null}
+          promptAction={screen === "intro" ? requestMic : undefined}
+          sheepBubble={
+            screen === "intro" ? (
+              <span className="mic-question">
+                <Mic size={14} strokeWidth={3} aria-hidden="true" />?
+              </span>
+            ) : undefined
+          }
           preview
         />
       )}
 
-      {!isRunning && !isOnboarding && screen !== "calibrating" && (
+      {!isRunning &&
+        !isOnboarding &&
+        screen !== "calibrating" &&
+        screen !== "intro" && (
         <div className="screen-overlay">
-          {screen === "intro" && (
-            <SetupPanel
-              title="Baa"
-              eyebrow={
-                <img
-                  className="setup-emoji-asset"
-                  src={notoSheepUrl}
-                  alt=""
-                  draggable={false}
-                />
-              }
-              buttonLabel="Use microphone"
-              onPrimary={requestMic}
-            >
-              <p>Say baaah</p>
-            </SetupPanel>
-          )}
-
           {screen === "results" && (
             <SetupPanel
               title="Barn reached"
@@ -630,6 +639,8 @@ function GameScene({
   prompt = "",
   promptHint = "",
   promptProgress = null,
+  promptAction,
+  sheepBubble,
   preview = false,
 }: {
   game: GameState;
@@ -642,6 +653,8 @@ function GameScene({
   prompt?: string;
   promptHint?: string;
   promptProgress?: number | null;
+  promptAction?: () => void;
+  sheepBubble?: ReactNode;
   preview?: boolean;
 }) {
   const courseRef = useRef<HTMLDivElement | null>(null);
@@ -714,7 +727,17 @@ function GameScene({
 
         {prompt && (
           <div className="onboarding-prompt">
-            <strong>{prompt}</strong>
+            {promptAction ? (
+              <button
+                className="onboarding-prompt-button"
+                type="button"
+                onClick={promptAction}
+              >
+                {prompt}
+              </button>
+            ) : (
+              <strong>{prompt}</strong>
+            )}
             {promptProgress !== null && (
               <div
                 className="onboarding-hold-meter"
@@ -778,7 +801,7 @@ function GameScene({
 
         <div className="sheep-x" style={sheepXStyle}>
           <div className="baa-bubble-wrap" style={sheepYStyle}>
-            <span className="baa-bubble">{input.label}</span>
+            <span className="baa-bubble">{sheepBubble ?? input.label}</span>
           </div>
           <div className={sheepClass} style={sheepYStyle}>
             <img
