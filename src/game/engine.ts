@@ -8,11 +8,9 @@ export const BASE_SPEED = 600
 export const HIT_WINDOW = 24
 export const LANE_EASE_MS = 210
 
-const laneOrder: Lane[] = [1, 0, -1]
-
 const eventMessages: Record<GameEventKind, string> = {
   'wolf-hit': 'Again!',
-  finish: 'barn!',
+  finish: 'wheat!',
 }
 
 export function laneToPercent(lane: Lane | number): number {
@@ -37,22 +35,7 @@ export function distanceToScreenX(distance: number): number {
   return COURSE_START_X + (clampedDistance / COURSE_LENGTH) * courseWidth
 }
 
-export function makeCourseItems(): GameItem[] {
-  const wolves: Array<{ id: string; lane: Lane; distance: number }> = [
-    { id: 'wolf-top', lane: 1, distance: 920 },
-    { id: 'wolf-bottom', lane: -1, distance: 1700 },
-    { id: 'wolf-middle', lane: 0, distance: 2440 },
-  ]
-
-  return wolves.map((wolf) => ({
-    ...wolf,
-    kind: 'wolf',
-    collectedOrHit: false,
-    missed: false,
-  }))
-}
-
-export function createInitialGameState(): GameState {
+export function createInitialGameState(items: GameItem[] = []): GameState {
   return {
     elapsedMs: 0,
     progress: 0,
@@ -67,7 +50,7 @@ export function createInitialGameState(): GameState {
       tumbleMs: 0,
       blinkMs: 0,
     },
-    items: makeCourseItems(),
+    items: items.map((item) => ({ ...item })),
     events: [],
   }
 }
@@ -155,32 +138,42 @@ export function updateGameState(
       Math.abs(item.distance - next.progress) <= HIT_WINDOW
 
     if (canCollide) {
-      next.progress = 0
-      next.items = makeCourseItems()
-      next.sheep.lane = 0
-      next.sheep.targetLane = 0
-      next.sheep.lanePosition = 0
-      next.sheep.tumbleMs = 900
-      next.sheep.blinkMs = 1200
-      addEvent(next, 'wolf-hit')
-      return next
+      const collision = level.resolveItemCollision(item, next)
+
+      if (collision.kind === 'restart') {
+        restartRun(next, level)
+        addEvent(next, collision.event)
+        return next
+      }
     }
   }
 
   if (next.progress >= COURSE_LENGTH) {
-    if (next.sheep.lane === level.finishLane) {
+    const courseEnd = level.resolveCourseEnd(next)
+
+    if (courseEnd.kind === 'finish') {
       next.finished = true
       next.outcome = 'won'
       next.finishTimeMs = next.elapsedMs
       next.progress = COURSE_LENGTH
-      addEvent(next, 'finish')
+      addEvent(next, courseEnd.event)
     } else {
       next.progress %= COURSE_LENGTH
-      next.items = makeCourseItems()
+      next.items = level.createItems()
     }
   }
 
   return next
+}
+
+function restartRun(state: GameState, level: LevelDefinition): void {
+  state.progress = 0
+  state.items = level.createItems()
+  state.sheep.lane = 0
+  state.sheep.targetLane = 0
+  state.sheep.lanePosition = 0
+  state.sheep.tumbleMs = 900
+  state.sheep.blinkMs = 1200
 }
 
 function addEvent(state: GameState, kind: GameEventKind): void {

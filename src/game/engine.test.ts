@@ -9,7 +9,6 @@ import {
   getCourseItems,
   HIT_WINDOW,
   lanePositionToPercent,
-  makeCourseItems,
   updateGameState,
   updatePracticeGameState,
 } from './engine'
@@ -17,6 +16,7 @@ import { getLevel } from './levels'
 import type { GameState, Lane } from '../types'
 
 const levelOne = getLevel(1)
+const levelTwo = getLevel(2)
 
 function stateAtWolf(lane: Lane = 0): GameState {
   const state = createInitialGameState()
@@ -51,8 +51,12 @@ describe('runner engine', () => {
     expect(lanePositionToPercent(0.5)).toBe(41)
   })
 
-  it('generates wolves only', () => {
-    const items = makeCourseItems()
+  it('keeps level one item-free', () => {
+    expect(levelOne.createItems()).toHaveLength(0)
+  })
+
+  it('generates wolves for level two', () => {
+    const items = levelTwo.createItems()
 
     expect(items).toHaveLength(3)
     expect(items.every((item) => item.kind === 'wolf')).toBe(true)
@@ -87,7 +91,7 @@ describe('runner engine', () => {
     state.sheep.lane = 0
     state.sheep.lanePosition = 0
 
-    const next = updateGameState(state, 0, 16, levelOne)
+    const next = updateGameState(state, 0, 16, levelTwo)
 
     expect(next.items[0].collectedOrHit).toBe(false)
     expect(next.finished).toBe(false)
@@ -105,7 +109,7 @@ describe('runner engine', () => {
   })
 
   it('resets to the start when the sheep hits a wolf', () => {
-    const next = updateGameState(stateAtWolf(), 0, 16, levelOne)
+    const next = updateGameState(stateAtWolf(), 0, 16, levelTwo)
 
     expect(next.finished).toBe(false)
     expect(next.outcome).toBe('running')
@@ -115,7 +119,7 @@ describe('runner engine', () => {
     expect(next.items).toHaveLength(3)
   })
 
-  it('wins when the sheep reaches the barn', () => {
+  it('wins when the sheep reaches the wheat', () => {
     const state = createInitialGameState()
     state.progress = COURSE_LENGTH - 1
     state.sheep.lane = 1
@@ -131,7 +135,7 @@ describe('runner engine', () => {
     expect(next.progress).toBe(COURSE_LENGTH)
   })
 
-  it('loops when the sheep reaches the end outside the barn lane', () => {
+  it('loops when the sheep reaches the end outside the wheat lane', () => {
     const state = createInitialGameState()
     state.progress = COURSE_LENGTH - 1
     state.sheep.lane = 0

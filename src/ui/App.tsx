@@ -22,7 +22,7 @@ import {
   updateGameState,
   updatePracticeGameState,
 } from "../game/engine";
-import { getLevel, type LevelDefinition } from "../game/levels";
+import { getLevel, getNextLevel, type LevelDefinition } from "../game/levels";
 import type { GameState, InputState, Lane } from "../types";
 
 type Screen =
@@ -85,6 +85,7 @@ export function App() {
   );
   const [setupInput, setSetupInput] = useState<InputState>(idleInput);
   const [calibrationProgress, setCalibrationProgress] = useState(0);
+  const [currentLevelId, setCurrentLevelId] = useState(1);
   const [message, setMessage] = useState("");
   const retryTimerRef = useRef<number | null>(null);
   const autoMicStartedRef = useRef(false);
@@ -167,7 +168,9 @@ export function App() {
     micRef.current !== null &&
     measuredBaseHz !== null &&
     voicedThresholdRms !== null;
-  const activeLevel = getLevel(isRunning || screen === "results" ? 1 : 0);
+  const activeLevel = getLevel(
+    isRunning || screen === "results" ? currentLevelId : 0,
+  );
 
   return (
     <main className="app-shell">
@@ -178,7 +181,7 @@ export function App() {
 
       {isRunning ? (
         <RunningGame
-          key={`${measuredBaseHz}-${screen}`}
+          key={`${measuredBaseHz}-${screen}-${activeLevel.id}`}
           measuredBaseHz={measuredBaseHz!}
           lowBaaHz={lowBaaHz}
           highBaaHz={highBaaHz}
@@ -189,7 +192,12 @@ export function App() {
             void calibrate(micRef.current);
           }}
           onFinish={() => {
-            setScreen("results");
+            const nextLevel = getNextLevel(activeLevel.id);
+            if (nextLevel) {
+              setCurrentLevelId(nextLevel.id);
+            } else {
+              setScreen("results");
+            }
           }}
         />
       ) : isOnboarding ? (
@@ -205,6 +213,7 @@ export function App() {
             void calibrate(micRef.current);
           }}
           onComplete={() => {
+            setCurrentLevelId(1);
             setScreen("running");
           }}
           onLowBaa={setLowBaaHz}
@@ -548,7 +557,7 @@ function onboardingTargetLane(step: OnboardingStep, input: InputState): Lane {
 function onboardingPrompt(step: OnboardingStep): string {
   if (step === "low") return "Make a lower pitch";
   if (step === "high") return "Make a higher pitch";
-  return "Avoid the wolves!";
+  return "Reach the wheat!";
 }
 
 function completedLowPitch(input: InputState, game: GameState): boolean {
@@ -582,7 +591,7 @@ function RunningGame({
   onResetBaseline: () => void;
   onFinish: () => void;
 }) {
-  const gameRef = useRef<GameState>(createInitialGameState());
+  const gameRef = useRef<GameState>(createInitialGameState(level.createItems()));
   const filterRef = useRef(
     createPitchLaneFilter(measuredBaseHz, voicedThresholdRms),
   );
@@ -637,7 +646,7 @@ function RunningGame({
 
     animationFrame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrame);
-  }, [mic, onFinish]);
+  }, [level, mic, onFinish]);
 
   return (
     <GameScene
@@ -692,8 +701,8 @@ function GameScene({
   const sheepTop = lanePositionToPercent(game.sheep.lanePosition);
   const courseItems = showItems ? getCourseItems(game) : [];
   const sheepX = distanceToScreenX(game.progress);
-  const barnX = distanceToScreenX(COURSE_LENGTH);
-  const wheatTop = laneToPercent(level.finishLane);
+  const finishX = distanceToScreenX(COURSE_LENGTH);
+  const finishTop = laneToPercent(level.finish?.lane ?? 0);
   const sheepClass = [
     "sheep",
     game.sheep.tumbleMs > 0 ? "sheep-tumble" : "",
@@ -837,10 +846,10 @@ function GameScene({
           </div>
         ))}
 
-        {showBarn && (
+        {showBarn && level.finish?.kind === "wheat" && (
           <div
             className="barn"
-            style={{ left: `${barnX}%`, top: `${wheatTop}%` }}
+            style={{ left: `${finishX}%`, top: `${finishTop}%` }}
             aria-label="wheat"
           >
             <img className="emoji-asset" src={notoWheatUrl} alt="" draggable={false} />
