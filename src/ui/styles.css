@@ -139,6 +139,7 @@ button {
   width: min(1100px, 100%);
   display: grid;
   gap: 12px;
+  padding-top: clamp(76px, 11vw, 116px);
 }
 
 .game-screen-preview {
@@ -704,6 +705,10 @@ button {
 
   .course {
     height: 64vh;
+  }
+
+  .game-screen {
+    padding-top: 86px;
   }
 
   .course-top-status,
