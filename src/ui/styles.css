@@ -206,7 +206,7 @@ button {
 
 .voice-control {
   display: grid;
-  justify-items: start;
+  justify-items: center;
   width: max-content;
   border: 1px solid rgba(56, 99, 45, 0.14);
   border-radius: 8px;
@@ -239,16 +239,43 @@ button {
   text-transform: uppercase;
 }
 
-.voice-control strong {
-  margin-top: 4px;
-  font-size: 18px;
-  line-height: 1.05;
+.voice-values,
+.voice-labels {
+  display: grid;
+  grid-template-columns: repeat(3, 46px);
+  gap: 4px;
+  width: 100%;
+  text-align: center;
+}
+
+.voice-values {
+  margin-top: 6px;
+}
+
+.voice-values strong {
+  color: #182015;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.voice-labels {
+  margin-top: 3px;
+}
+
+.voice-labels span {
+  color: #526449;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .voice-control em {
   width: 100%;
-  margin-top: 6px;
-  padding-top: 6px;
+  margin-top: 5px;
+  padding-top: 5px;
   border-top: 1px solid rgba(82, 100, 73, 0.24);
   color: #225c3a;
 }
@@ -710,8 +737,10 @@ button {
     padding: 6px 7px;
   }
 
-  .voice-control strong {
-    font-size: 14px;
+  .voice-values,
+  .voice-labels {
+    grid-template-columns: repeat(3, 43px);
+    gap: 3px;
   }
 
   .lane-guide span {

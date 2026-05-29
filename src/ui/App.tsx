@@ -76,6 +76,8 @@ export function App() {
   const previewGameRef = useRef<GameState>(createInitialGameState());
   const [screen, setScreen] = useState<Screen>("intro");
   const [measuredBaseHz, setMeasuredBaseHz] = useState<number | null>(null);
+  const [lowBaaHz, setLowBaaHz] = useState<number | null>(null);
+  const [highBaaHz, setHighBaaHz] = useState<number | null>(null);
   const [voicedThresholdRms, setVoicedThresholdRms] = useState<number | null>(
     null,
   );
@@ -97,6 +99,8 @@ export function App() {
   const requestMic = async () => {
     setMessage("");
     setSetupInput(idleInput);
+    setLowBaaHz(null);
+    setHighBaaHz(null);
     try {
       const mic = await MicrophonePitchController.create();
       micRef.current = mic;
@@ -116,6 +120,8 @@ export function App() {
 
     setMessage("");
     setCalibrationProgress(0);
+    setLowBaaHz(null);
+    setHighBaaHz(null);
     setScreen("calibrating");
 
     const calibration = await mic.calibrate({
@@ -180,6 +186,8 @@ export function App() {
         <RunningGame
           key={`${measuredBaseHz}-${screen}`}
           measuredBaseHz={measuredBaseHz!}
+          lowBaaHz={lowBaaHz}
+          highBaaHz={highBaaHz}
           voicedThresholdRms={voicedThresholdRms!}
           mic={micRef.current!}
           onResetBaseline={() => {
@@ -193,6 +201,8 @@ export function App() {
         <OnboardingGame
           key={`${measuredBaseHz}-${screen}`}
           measuredBaseHz={measuredBaseHz!}
+          lowBaaHz={lowBaaHz}
+          highBaaHz={highBaaHz}
           voicedThresholdRms={voicedThresholdRms!}
           mic={micRef.current!}
           onResetBaseline={() => {
@@ -201,12 +211,16 @@ export function App() {
           onComplete={() => {
             setScreen("running");
           }}
+          onLowBaa={setLowBaaHz}
+          onHighBaa={setHighBaaHz}
         />
       ) : (
         <GameScene
           game={previewGameRef.current}
           input={setupInput}
           measuredBaseHz={measuredBaseHz}
+          lowBaaHz={lowBaaHz}
+          highBaaHz={highBaaHz}
           visibleLanes={screen === "calibrating" ? [0] : [1, 0, -1]}
           showBarn={screen !== "calibrating"}
           showItems={screen !== "calibrating"}
@@ -319,16 +333,24 @@ function SetupPanel({
 
 function OnboardingGame({
   measuredBaseHz,
+  lowBaaHz,
+  highBaaHz,
   voicedThresholdRms,
   mic,
   onResetBaseline,
   onComplete,
+  onLowBaa,
+  onHighBaa,
 }: {
   measuredBaseHz: number;
+  lowBaaHz: number | null;
+  highBaaHz: number | null;
   voicedThresholdRms: number;
   mic: MicrophonePitchController;
   onResetBaseline: () => void;
   onComplete: () => void;
+  onLowBaa: (hz: number) => void;
+  onHighBaa: (hz: number) => void;
 }) {
   const gameRef = useRef<GameState>(createPracticeGameState());
   const filterRef = useRef(
@@ -411,6 +433,9 @@ function OnboardingGame({
         completedLowPitch(inputRef.current, nextGame)
       ) {
         lowPitchRef.current = inputRef.current.pitchHz;
+        if (inputRef.current.pitchHz !== null) {
+          onLowBaa(inputRef.current.pitchHz);
+        }
         stepRef.current = "high";
         setStep("high");
         setShowHint(false);
@@ -424,6 +449,9 @@ function OnboardingGame({
         !completedRef.current
       ) {
         highPitchRef.current = inputRef.current.pitchHz;
+        if (inputRef.current.pitchHz !== null) {
+          onHighBaa(inputRef.current.pitchHz);
+        }
         stepRef.current = "ready";
         setStep("ready");
         setShowHint(false);
@@ -448,13 +476,15 @@ function OnboardingGame({
 
     animationFrame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrame);
-  }, [mic, onComplete]);
+  }, [mic, onComplete, onHighBaa, onLowBaa]);
 
   return (
     <GameScene
       game={game}
       input={input}
       measuredBaseHz={measuredBaseHz}
+      lowBaaHz={lowBaaHz}
+      highBaaHz={highBaaHz}
       onResetBaseline={onResetBaseline}
       visibleLanes={step === "low" ? [0, -1] : [1, 0, -1]}
       showBarn={false}
@@ -551,12 +581,16 @@ function completedHighPitch(
 
 function RunningGame({
   measuredBaseHz,
+  lowBaaHz,
+  highBaaHz,
   voicedThresholdRms,
   mic,
   onResetBaseline,
   onFinish,
 }: {
   measuredBaseHz: number;
+  lowBaaHz: number | null;
+  highBaaHz: number | null;
   voicedThresholdRms: number;
   mic: MicrophonePitchController;
   onResetBaseline: () => void;
@@ -623,6 +657,8 @@ function RunningGame({
       game={game}
       input={input}
       measuredBaseHz={measuredBaseHz}
+      lowBaaHz={lowBaaHz}
+      highBaaHz={highBaaHz}
       onResetBaseline={onResetBaseline}
     />
   );
@@ -632,6 +668,8 @@ function GameScene({
   game,
   input,
   measuredBaseHz,
+  lowBaaHz,
+  highBaaHz,
   onResetBaseline,
   visibleLanes = [1, 0, -1],
   showBarn = true,
@@ -646,6 +684,8 @@ function GameScene({
   game: GameState;
   input: InputState;
   measuredBaseHz: number | null;
+  lowBaaHz?: number | null;
+  highBaaHz?: number | null;
   onResetBaseline?: () => void;
   visibleLanes?: Lane[];
   showBarn?: boolean;
@@ -713,10 +753,17 @@ function GameScene({
             disabled={!onResetBaseline}
             onClick={onResetBaseline}
           >
-            <span>Your baa</span>
-            <strong>
-              {measuredBaseHz ? `${Math.round(measuredBaseHz)} Hz` : "- Hz"}
-            </strong>
+            <span>Your Baas</span>
+            <div className="voice-values" aria-hidden="true">
+              <strong>{formatHz(lowBaaHz)}</strong>
+              <strong>{formatHz(measuredBaseHz)}</strong>
+              <strong>{formatHz(highBaaHz)}</strong>
+            </div>
+            <div className="voice-labels">
+              <span>Low</span>
+              <span>Base</span>
+              <span>High</span>
+            </div>
             <em>Reset</em>
           </button>
         </div>
@@ -883,6 +930,10 @@ function formatPitchStatus(status: InputState["pitchStatus"]): string {
   if (status === "too-low") return "low";
   if (status === "too-high") return "high";
   return status;
+}
+
+function formatHz(hz: number | null | undefined): string {
+  return hz ? `${Math.round(hz)} Hz` : "- Hz";
 }
 
 function getPitchWavePoints(
